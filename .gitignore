@@ -1,28 +1,11 @@
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# CMake files
+/CMakeFiles/*
+Makefile
+CMakeCache.txt
+cmake_install.cmake
 
-# Precompiled Headers
-*.gch
-*.pch
+# Indigo SDK
+/indigosdk-2.0.34/*
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+# Binaries
+/bin/*
