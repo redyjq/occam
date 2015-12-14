@@ -36,13 +36,43 @@ int convertToPcl(OccamPointCloud * occamPointCloud, pcl::PointCloud<pcl::PointXY
 		numPointsConverted++;
 	}
 
+	pclPointCloud->is_dense = false;
+
 	return numPointsConverted;
 }
 
-void save_pointcloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud) {
+void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud) {
     std::string name = "data/pointcloud.pcd";
     pcl::PCDWriter writer;
     writer.write<pcl::PointXYZRGBA> (name, *point_cloud); 
+}
+
+void capturePointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
+	// Capture a point cloud
+	OccamDataName requestTypes[] = { OCCAM_POINT_CLOUD4 };
+	OccamDataType returnTypes[] = { OCCAM_POINT_CLOUD };
+	OccamPointCloud* pointCloud;
+	handleError(occamDeviceReadData(device, 1, requestTypes, returnTypes, (void**)&pointCloud, 1));
+
+	// Print statistics
+	printf("Number of points in Occam point cloud: %d\n", pointCloud->point_count);
+
+	// Convert to PCL point cloud
+	int numConverted = convertToPcl(pointCloud, pclPointCloud);
+	printf("Number of points converted to PCL: %d\n", numConverted);
+
+	// Clean up
+	handleError(occamFreePointCloud(pointCloud));
+}
+
+void visualizePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
+    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));     
+    
+    pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(pclPointCloud);                       
+    viewer->addPointCloud<pcl::PointXYZRGBA> (pclPointCloud, rgb, "cloud");
+    while (!viewer->wasStopped()) {
+        viewer->spinOnce();    
+    }
 }
 
 int main(int argc, char** argv) {
@@ -64,34 +94,17 @@ int main(int argc, char** argv) {
 	handleError(occamOpenDevice(cid, &device));
 	printf("Opened device: %p\n", device);
 
-	// Capture a point cloud
-	OccamDataName requestTypes[] = { OCCAM_POINT_CLOUD2 };
-	OccamDataType returnTypes[] = { OCCAM_POINT_CLOUD };
-	OccamPointCloud* pointCloud;
-	handleError(occamDeviceReadData(device, 1, requestTypes, returnTypes, (void**)&pointCloud, 1));
-
-	// Print statistics
-	printf("Number of points in Occam point cloud: %d\n", pointCloud->point_count);
-
-	// Convert to PCL point cloud
+	// Capture point cloud
 	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-	int numConverted = convertToPcl(pointCloud, pclPointCloud);
-	printf("Number of points converted to PCL: %d\n", numConverted);
+	capturePointCloud(device, pclPointCloud);
 
 	// Save point cloud
-	save_pointcloud(pclPointCloud);
+	savePointCloud(pclPointCloud);
 
 	// Display created pointcloud
-    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));     
-    
-    pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(pclPointCloud);                       
-    viewer->addPointCloud<pcl::PointXYZRGBA> (pclPointCloud, rgb, "cloud");
-    while (!viewer->wasStopped()) {
-        viewer->spinOnce();    
-    }
+	visualizePointCloud(pclPointCloud);
 
 	// Clean up
-	handleError(occamFreePointCloud(pointCloud));
 	handleError(occamCloseDevice(device));
 	handleError(occamFreeDeviceList(deviceList));
 	handleError(occamShutdown());
