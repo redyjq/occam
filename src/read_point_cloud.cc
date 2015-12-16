@@ -5,6 +5,11 @@
 #include <pcl/point_cloud.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/io/pcd_io.h>
+#include <assert.h>
+#include <iostream>
+#include <string>
+#include <sstream>
+#include <vector>
 
 void handleError(int returnCode) {
 	if (returnCode != OCCAM_API_SUCCESS) {
@@ -75,6 +80,79 @@ void visualizePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) 
     }
 }
 
+void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
+	// Capture RBG image and disparity image
+	OccamDataName requestTypes[] = { OCCAM_IMAGE0, OCCAM_DISPARITY_IMAGE0 };
+	OccamDataType returnTypes[] = { OCCAM_IMAGE, OCCAM_IMAGE };
+	OccamImage** images = (OccamImage**)occamAlloc(2 * sizeof(OccamImage*));
+	handleError(occamDeviceReadData(device, 2, requestTypes, returnTypes, (void**)images, 1));
+
+	printf("RGB Image: %s\n", images[0]->cid);
+	printf("RGB Image format: %d\n", images[0]->format);
+	printf("Disparity Image: %s\n", images[1]->cid);
+	printf("Disparity Image format: %d\n", images[1]->format);
+
+	// Get basic sensor information for the camera
+	int sensor_count;
+	handleError(occamGetDeviceValuei(device, OCCAM_SENSOR_COUNT, &sensor_count));
+  	int sensor_width;
+  	handleError(occamGetDeviceValuei(device, OCCAM_SENSOR_WIDTH, &sensor_width));
+  	int sensor_height;
+  	handleError(occamGetDeviceValuei(device, OCCAM_SENSOR_HEIGHT, &sensor_height));
+
+  	// Initialize sensor parameter variables
+    double* Dp[sensor_count];
+  	double* Kp[sensor_count];
+  	double* Rp[sensor_count];
+  	double* Tp[sensor_count];
+
+  	// Get sensor parameters for all sensors
+  	for (int i = 0; i < sensor_count; ++i) {
+  		double D[5];
+	  	handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_DISTORTION_COEFS0 + i), D, 5));
+	  	Dp[i] = D;
+	  	double K[9];
+	  	handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_INTRINSICS0 + i), K, 9));
+	  	Kp[i] = K;
+	  	double R[9];
+	  	handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_ROTATION0 + i), R, 9));
+	  	Rp[i] = R;
+	  	double T[3];
+	  	handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_TRANSLATION0 + i), T, 3));
+	  	Tp[i] = T;
+  	}
+
+  	// Initialize interface to the Occam Stereo Rectify module
+  	void* rectifyHandle = 0;
+	occamConstructModule(OCCAM_MODULE_STEREO_RECTIFY, "prec", &rectifyHandle);
+	assert(rectifyHandle);
+	IOccamStereoRectify* rectifyIface = 0;
+	occamGetInterface(rectifyHandle, IOCCAMSTEREORECTIFY, (void**)&rectifyIface);
+	assert(rectifyIface);
+
+	// Configure the module with the sensor information
+  	handleError(rectifyIface->configure(rectifyHandle, sensor_count, sensor_width, sensor_height, Dp, Kp, Rp, Tp, 0));
+
+  	// Get point cloud for the image
+  	int indices[] = {0};
+  	OccamImage* rgbImages[1];
+  	rgbImages[0] = images[0];
+  	OccamImage* disparityImages[1];
+  	disparityImages[0] = images[1];
+  	OccamPointCloud* pointCloud;
+  	handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, &pointCloud));
+
+	// Print statistics
+	printf("Number of points in Occam point cloud: %d\n", pointCloud->point_count);
+
+	// Convert to PCL point cloud
+	int numConverted = convertToPcl(pointCloud, pclPointCloud);
+	printf("Number of points converted to PCL: %d\n", numConverted);
+
+  	// Clean up
+  	handleError(occamFreePointCloud(pointCloud));
+}
+
 int main(int argc, char** argv) {
 
 	// Initialize Occam SDK
@@ -96,7 +174,8 @@ int main(int argc, char** argv) {
 
 	// Capture point cloud
 	pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-	capturePointCloud(device, pclPointCloud);
+	// capturePointCloud(device, pclPointCloud);
+	constructPointCloud(device, pclPointCloud);
 
 	// Save point cloud
 	savePointCloud(pclPointCloud);
