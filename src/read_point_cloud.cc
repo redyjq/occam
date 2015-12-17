@@ -6,10 +6,11 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/io/pcd_io.h>
 #include <assert.h>
-#include <iostream>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <string>
 #include <sstream>
-#include <vector>
+
 
 void handleError(int returnCode) {
 	if (returnCode != OCCAM_API_SUCCESS) {
@@ -35,7 +36,7 @@ int convertToPcl(OccamPointCloud * occamPointCloud, pcl::PointCloud<pcl::PointXY
 		point->y = occamPointCloud->xyz[i+1];
 		point->z = occamPointCloud->xyz[i+2];
 
-		printf("R: %d G: %d B: %d X: %f Y: %f Z: %f\n", point->r, point->g, point->b, point->x, point->y, point->z);
+		//printf("R: %d G: %d B: %d X: %f Y: %f Z: %f\n", point->r, point->g, point->b, point->x, point->y, point->z);
 
 		pclPointCloud->push_back(*point);
 		numPointsConverted++;
@@ -50,6 +51,27 @@ void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud) {
     std::string name = "data/pointcloud.pcd";
     pcl::PCDWriter writer;
     writer.write<pcl::PointXYZRGBA> (name, *point_cloud); 
+}
+
+void saveImage(OccamImage* image, std::string fileName) {
+	cv::Mat cvImage;
+	if (image && image->format == OCCAM_GRAY8) {
+		cvImage = cv::Mat_<uchar>(image->height, image->width, (uchar*)image->data[0], image->step[0]);
+	}
+	else if (image && image->format == OCCAM_RGB24) {
+		cvImage = cv::Mat_<cv::Vec3b>(image->height, image->width, (cv::Vec3b*)image->data[0], image->step[0]);
+		cv::Mat colorImage;
+		cv::cvtColor(cvImage, colorImage, cv::COLOR_BGR2RGB);
+		cvImage = colorImage;
+	}
+	else if (image && image->format == OCCAM_SHORT1) {
+		cvImage = cv::Mat_<short>(image->height, image->width, (short*)image->data[0], image->step[0]);
+	}
+	else {
+		printf("Image type not supported: %d\n", image->format);
+	}
+
+	imwrite(fileName, cvImage);
 }
 
 void capturePointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
@@ -80,17 +102,25 @@ void visualizePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) 
     }
 }
 
+OccamImage* captureImage(OccamDevice* device, OccamDataName requestType) {
+	OccamDataName* req = (OccamDataName*)occamAlloc(sizeof(OccamDataName));
+	req[0] = requestType;
+	OccamImage** images = (OccamImage**)occamAlloc(sizeof(OccamImage*));
+	handleError(occamDeviceReadData(device, 1, req, 0, (void**)images, 1));
+	occamFree(req);
+	return images[0];
+}
+
 void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
 	// Capture RBG image and disparity image
-	OccamDataName requestTypes[] = { OCCAM_IMAGE0, OCCAM_DISPARITY_IMAGE0 };
-	OccamDataType returnTypes[] = { OCCAM_IMAGE, OCCAM_IMAGE };
-	OccamImage** images = (OccamImage**)occamAlloc(2 * sizeof(OccamImage*));
-	handleError(occamDeviceReadData(device, 2, requestTypes, returnTypes, (void**)images, 1));
+	OccamImage* rgbImage = captureImage(device, OCCAM_IMAGE2);
+	printf("RGB Image captured at time: %llu\n", (long long unsigned int)rgbImage->time_ns);
+	OccamImage* disparityImage = captureImage(device, OCCAM_DISPARITY_IMAGE1);
+	printf("Disparity Image captured at time: %llu\n", (long long unsigned int)disparityImage->time_ns);
 
-	printf("RGB Image: %s\n", images[0]->cid);
-	printf("RGB Image format: %d\n", images[0]->format);
-	printf("Disparity Image: %s\n", images[1]->cid);
-	printf("Disparity Image format: %d\n", images[1]->format);
+	// Save the images
+	saveImage(rgbImage, "rgbImage.jpg");
+	saveImage(disparityImage, "disparityImage.jpg");
 
 	// Get basic sensor information for the camera
 	int sensor_count;
@@ -136,9 +166,9 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
   	// Get point cloud for the image
   	int indices[] = {0};
   	OccamImage* rgbImages[1];
-  	rgbImages[0] = images[0];
+  	rgbImages[0] = rgbImage;
   	OccamImage* disparityImages[1];
-  	disparityImages[0] = images[1];
+  	disparityImages[0] = disparityImage;
   	OccamPointCloud* pointCloud;
   	handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, &pointCloud));
 
@@ -184,6 +214,7 @@ int main(int argc, char** argv) {
 	visualizePointCloud(pclPointCloud);
 
 	// Clean up
+	
 	handleError(occamCloseDevice(device));
 	handleError(occamFreeDeviceList(deviceList));
 	handleError(occamShutdown());
