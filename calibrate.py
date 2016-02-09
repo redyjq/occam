@@ -38,11 +38,11 @@ def calibrate_sensor(sensor):
     cv2.destroyAllWindows()
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1],None,None)
-    np.save(open('sensor%s/ret'), ret)
-    np.save(open('sensor%s/mtx'), mtx)
-    np.save(open('sensor%s/dist'), dist)
-    np.save(open('sensor%s/rvecs'), rvecs)
-    np.save(open('sensor%s/tvecs'), tvecs)
+    np.save(open('sensor%s/ret'   % sensor, 'w'), ret)
+    np.save(open('sensor%s/mtx'   % sensor, 'w'), mtx)
+    np.save(open('sensor%s/dist'  % sensor, 'w'), dist)
+    np.save(open('sensor%s/rvecs' % sensor, 'w'), rvecs)
+    np.save(open('sensor%s/tvecs' % sensor, 'w'), tvecs)
 
 for sensor in range(9):
     calibrate_sensor(sensor)
