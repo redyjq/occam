@@ -1,6 +1,10 @@
 import numpy as np
 import cv2
 import glob
+import random
+
+images_per_calib = 12
+num_sensors = 10
 
 
 def calibrate_sensor(sensor):
@@ -16,6 +20,8 @@ def calibrate_sensor(sensor):
     objpoints = [] # 3d point in real world space
     imgpoints = [] # 2d points in image plane.
     images = glob.glob('sensor%s/*.jpg' % sensor)
+    count = 0
+    random.shuffle(images)
     for fname in images:
         img = cv2.imread(fname)
         gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
@@ -34,6 +40,12 @@ def calibrate_sensor(sensor):
             cv2.drawChessboardCorners(img, (8,6), corners,ret)
             cv2.imshow('img',img)
             cv2.waitKey(500)
+            count += 1
+
+        print("Progress: %f" % (float(images_per_calib * sensor + count) / (images_per_calib * num_sensors)))
+        if count >= images_per_calib:
+            break
+
 
     cv2.destroyAllWindows()
 
@@ -44,5 +56,7 @@ def calibrate_sensor(sensor):
     np.save(open('sensor%s/rvecs' % sensor, 'w'), rvecs)
     np.save(open('sensor%s/tvecs' % sensor, 'w'), tvecs)
 
-for sensor in range(9):
+for sensor in range(num_sensors):
+    if sensor == 2:
+        continue
     calibrate_sensor(sensor)
