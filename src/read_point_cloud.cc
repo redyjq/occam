@@ -118,7 +118,7 @@ void captureAllPointClouds(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGB
         *pclPointCloud += *tempCloud;
     }
     printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
-    
+
     // Clean up
     occamFree(pointClouds);
 }
@@ -232,16 +232,25 @@ int main(int argc, char** argv) {
     char* cid = deviceList->entries[0].cid;
     handleError(occamOpenDevice(cid, &device));
     printf("Opened device: %p\n", device);
+    
+    // Initialize viewer
+    pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));
 
-    // Capture point cloud
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr largeCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-    captureAllPointClouds(device, largeCloud);
+    // Display initial point cloud
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+    pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(cloud);
+    viewer->addPointCloud<pcl::PointXYZRGBA> (cloud, rgb, "cloud");
+    viewer->spinOnce();
 
-    // Save point cloud
-    savePointCloud(largeCloud);
-
-    // Display created pointcloud
-    visualizePointCloud(largeCloud);
+    // Keep updating point cloud until viewer is stopped
+    while(!viewer->wasStopped()) {
+        (*cloud).clear();
+        capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+        rgb.setInputCloud(cloud);
+        viewer->updatePointCloud(cloud, rgb, "cloud");
+        viewer->spinOnce();
+    }
 
     // Clean up
     handleError(occamCloseDevice(device));
