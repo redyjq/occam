@@ -10,7 +10,7 @@ include(FindOpenCV.cmake)
 include_directories(${OpenCV2_INCLUDE_DIRS} ${OpenCV_DIR})
 target_link_libraries(occam ${OpenCV_LIBS_OPT})
 
-find_package(PCL 1.2 REQUIRED)
+find_package(PCL 1.7 REQUIRED)
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
