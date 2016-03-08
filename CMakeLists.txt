@@ -20,3 +20,6 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/indigosdk-2.0.34/include)
 add_subdirectory(indigosdk-2.0.34)
 target_link_libraries(occam indigo)
+
+add_executable(point_cloud_from_disparity src/point_cloud_from_disparity.cc)
+target_link_libraries(point_cloud_from_disparity indigo ${PCL_LIBRARIES})
