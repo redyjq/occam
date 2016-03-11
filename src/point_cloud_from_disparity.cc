@@ -75,8 +75,12 @@ int main(int argc, char** argv) {
 	        point->y = h * depth / FOCAL_PIXELS;
 	        point->z = depth;     
 
-	     	// add point to point cloud   
-	        cloud->push_back(*point);
+                int CULL_THRESHOLD = 20000;
+                if (point->x + point->y + point->z < CULL_THRESHOLD) {
+                  // add point to point cloud   
+                  cloud->push_back(*point);
+                }
+
 	        //std::cout << "disparity: " << disparity << "   depth: " << depth << std::endl;
 	        
 	    }
