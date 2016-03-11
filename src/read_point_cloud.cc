@@ -38,8 +38,11 @@ int convertToPcl(OccamPointCloud * occamPointCloud, pcl::PointCloud<pcl::PointXY
 
         //printf("R: %d G: %d B: %d X: %f Y: %f Z: %f\n", point->r, point->g, point->b, point->x, point->y, point->z);
 
-        pclPointCloud->push_back(*point);
-        numPointsConverted++;
+        int CULL_THRESHOLD = 20000;
+        if (point->x + point->y + point->z < CULL_THRESHOLD) {
+          pclPointCloud->push_back(*point);
+          numPointsConverted++;
+        }
     }
 
     pclPointCloud->is_dense = false;
