@@ -77,7 +77,7 @@ def send_to_drive(local_folder_path: str, server_folder: str):
     if len(folders) < 1:
         print("No Drive folder named %s found!" % server_folder)
         return
-    folder_id = folders[0]
+    folder_id = folders[0]['id']
 
     files = os.listdir(local_folder_path)
     if len(files) < 1:
