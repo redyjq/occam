@@ -10,7 +10,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <string>
 #include <sstream>
-
+#include <math.h>
+#include <pcl/common/time.h>
 
 void handleError(int returnCode) {
     if (returnCode != OCCAM_API_SUCCESS) {
@@ -38,10 +39,14 @@ int convertToPcl(OccamPointCloud * occamPointCloud, pcl::PointCloud<pcl::PointXY
 
         //printf("R: %d G: %d B: %d X: %f Y: %f Z: %f\n", point->r, point->g, point->b, point->x, point->y, point->z);
 
-        int CULL_THRESHOLD = 20000;
-        if (point->x + point->y + point->z < CULL_THRESHOLD) {
-          pclPointCloud->push_back(*point);
-          numPointsConverted++;
+        double CULL_THRESHOLD = 1000;
+        double inf = std::numeric_limits<double>::infinity();
+        if (point->x < inf && point->y < inf && point->z < inf) {
+            double sqdist = point->x*point->x + point->y*point->y + point->z * point->z;
+            if (sqrt(sqdist) < CULL_THRESHOLD) {
+              pclPointCloud->push_back(*point);
+              numPointsConverted++;
+            }
         }
     }
 
@@ -50,10 +55,15 @@ int convertToPcl(OccamPointCloud * occamPointCloud, pcl::PointCloud<pcl::PointXY
     return numPointsConverted;
 }
 
-void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud) {
-    std::string name = "data/pointcloud.pcd";
+void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud, int counter) {
+    double timestamp = pcl::getTime();
+    std::stringstream ss;
+    ss << "data/pointcloud" << counter << ".pcd";
+    std::string name = ss.str();
     pcl::PCDWriter writer;
-    writer.write<pcl::PointXYZRGBA> (name, *point_cloud); 
+    if (point_cloud->size() > 0) {
+        writer.write<pcl::PointXYZRGBA> (name, *point_cloud); 
+    }
 }
 
 void saveImage(OccamImage* image, std::string fileName) {
@@ -246,13 +256,16 @@ int main(int argc, char** argv) {
     viewer->addPointCloud<pcl::PointXYZRGBA> (cloud, rgb, "cloud");
     viewer->spinOnce();
 
+    int counter = 0;
     // Keep updating point cloud until viewer is stopped
     while(!viewer->wasStopped()) {
         (*cloud).clear();
         capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+        savePointCloud(cloud, counter);
         rgb.setInputCloud(cloud);
         viewer->updatePointCloud(cloud, rgb, "cloud");
         viewer->spinOnce();
+        ++counter;
     }
 
     // Clean up

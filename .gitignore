@@ -9,3 +9,6 @@ cmake_install.cmake
 
 # Binaries
 /bin/*
+
+# Point cloud files
+*.pcd
