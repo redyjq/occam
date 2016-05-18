@@ -67,11 +67,13 @@ void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud, int cou
 }
 
 void saveImage(OccamImage* image, std::string fileName) {
+    cout << "made it here\n";
     cv::Mat cvImage;
     if (image && image->format == OCCAM_GRAY8) {
         cvImage = cv::Mat_<uchar>(image->height, image->width, (uchar*)image->data[0], image->step[0]);
     }
     else if (image && image->format == OCCAM_RGB24) {
+        printf("image type is color i think\n");
         cvImage = cv::Mat_<cv::Vec3b>(image->height, image->width, (cv::Vec3b*)image->data[0], image->step[0]);
         cv::Mat colorImage;
         cv::cvtColor(cvImage, colorImage, cv::COLOR_BGR2RGB);
@@ -84,6 +86,7 @@ void saveImage(OccamImage* image, std::string fileName) {
         printf("Image type not supported: %d\n", image->format);
     }
 
+    cout << "made it here too\n";
     imwrite(fileName, cvImage);
 }
 
@@ -154,6 +157,7 @@ OccamImage* captureImage(OccamDevice* device, OccamDataName requestType) {
     occamFree(req);
     return images[0];
 }
+
 
 void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
     // Capture RBG image and disparity image
@@ -227,6 +231,17 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
     handleError(occamFreePointCloud(pointCloud));
 }
 
+void** captureStitchedAndPointCloud(OccamDevice* device) {
+    OccamDataName* req = (OccamDataName*)occamAlloc(2*sizeof(OccamDataName));
+    req[0] = OCCAM_STITCHED_IMAGE0;
+    req[1] = OCCAM_POINT_CLOUD0;
+    OccamDataType returnTypes[] = {OCCAM_IMAGE, OCCAM_POINT_CLOUD};
+    //void** data = occamAlloc(sizeof(OccamImage*) + sizeof(OccamPointCloud*));
+    void** data = (void**)occamAlloc(sizeof(void*) * 2);
+    handleError(occamDeviceReadData(device, 2, req, returnTypes, data, 1));
+    return data;
+}
+
 int main(int argc, char** argv) {
 
     // Initialize Occam SDK
@@ -246,12 +261,18 @@ int main(int argc, char** argv) {
     handleError(occamOpenDevice(cid, &device));
     printf("Opened device: %p\n", device);
     
+
+
     // Initialize viewer
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));
 
     // Display initial point cloud
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-    capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+    //capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+    void** data = captureStitchedAndPointCloud(device);
+    OccamImage* image = (OccamImage*)data[0];
+    OccamPointCloud* occamCloud = (OccamPointCloud*)data[1];
+    convertToPcl(occamCloud, cloud);
     pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(cloud);
     viewer->addPointCloud<pcl::PointXYZRGBA> (cloud, rgb, "cloud");
     viewer->spinOnce();
@@ -260,8 +281,20 @@ int main(int argc, char** argv) {
     // Keep updating point cloud until viewer is stopped
     while(!viewer->wasStopped()) {
         (*cloud).clear();
-        capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+        void** data = captureStitchedAndPointCloud(device);
+        OccamImage* image = (OccamImage*)data[0];
+        OccamPointCloud* occamCloud = (OccamPointCloud*)data[1];
+        convertToPcl(occamCloud, cloud);
         savePointCloud(cloud, counter);
+
+        std::ostringstream imagename;
+        imagename << "data/stitched" << counter << ".jpg";
+        saveImage(image, imagename.str());
+
+        handleError(occamFreeImage(image));
+        handleError(occamFreePointCloud(occamCloud));
+
+        //capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
         rgb.setInputCloud(cloud);
         viewer->updatePointCloud(cloud, rgb, "cloud");
         viewer->spinOnce();

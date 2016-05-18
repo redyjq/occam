@@ -6,7 +6,6 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_SWIG_OUTDIR "${CMAKE_BINARY_DIR}/bin")
 
 add_executable(occam src/read_point_cloud.cc)
-add_executable(occam src/read_stitched.cc)
 
 include(FindOpenCV.cmake)
 include_directories(${OpenCV2_INCLUDE_DIRS} ${OpenCV_DIR})
