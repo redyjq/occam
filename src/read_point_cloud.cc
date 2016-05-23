@@ -1,17 +1,4 @@
-#include <indigo.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <pcl/point_types.h>
-#include <pcl/point_cloud.h>
-#include <pcl/visualization/pcl_visualizer.h>
-#include <pcl/io/pcd_io.h>
-#include <assert.h>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <string>
-#include <sstream>
-#include <math.h>
-#include <pcl/common/time.h>
+#include "read_point_cloud.h"
 
 void handleError(int returnCode) {
     if (returnCode != OCCAM_API_SUCCESS) {
@@ -66,23 +53,30 @@ void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud, int cou
     }
 }
 
-void saveImage(OccamImage* image, std::string fileName) {
-    cv::Mat cvImage;
+void occamImageToCvMat(OccamImage* &image, cv::Mat* &cvImage) {
     if (image && image->format == OCCAM_GRAY8) {
-        cvImage = cv::Mat_<uchar>(image->height, image->width, (uchar*)image->data[0], image->step[0]);
+        cvImage = new cv::Mat_<uchar>(image->height, image->width, (uchar*)image->data[0], image->step[0]);
     } else if (image && image->format == OCCAM_RGB24) {
-        cvImage = cv::Mat_<cv::Vec3b>(image->height, image->width, (cv::Vec3b*)image->data[0], image->step[0]);
-        cv::Mat colorImage;
-        cv::cvtColor(cvImage, colorImage, cv::COLOR_BGR2RGB);
+        cvImage =  new cv::Mat_<cv::Vec3b>(image->height, image->width, (cv::Vec3b*)image->data[0], image->step[0]);
+        cv::Mat* colorImage = new cv::Mat();
+        cv::cvtColor(*cvImage, *colorImage, cv::COLOR_BGR2RGB);
         cvImage = colorImage;
     } else if (image && image->format == OCCAM_SHORT1) {
-        cvImage = cv::Mat_<short>(image->height, image->width, (short*)image->data[0], image->step[0]);
+        cvImage = new cv::Mat_<short>(image->height, image->width, (short*)image->data[0], image->step[0]);
     } else {
         printf("Image type not supported: %d\n", image->format);
+        cvImage = NULL;
     }
+}
 
-    cout << "made it here too\n";
-    imwrite(fileName, cvImage);
+void saveImage(OccamImage* image, std::string fileName) {
+    cv::Mat* cvImage;
+    occamImageToCvMat(image, cvImage);
+    saveImage(cvImage,fileName);
+}
+
+void saveImage(cv::Mat* cvImage, std::string fileName) {
+    imwrite(fileName, *cvImage);
 }
 
 void capturePointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud, OccamDataName PCLOUD) {
@@ -235,14 +229,12 @@ void** captureStitchedAndPointCloud(OccamDevice* device) {
     req[4] = OCCAM_POINT_CLOUD3;
     req[5] = OCCAM_POINT_CLOUD4;
     OccamDataType returnTypes[] = {OCCAM_IMAGE, OCCAM_POINT_CLOUD};
-    //void** data = occamAlloc(sizeof(OccamImage*) + sizeof(OccamPointCloud*));
     void** data = (void**)occamAlloc(sizeof(void*) * 6);
     handleError(occamDeviceReadData(device, 6, req, returnTypes, data, 1));
     return data;
 }
 
-int main(int argc, char** argv) {
-
+std::pair<OccamDevice*, OccamDeviceList*> initializeOccamAPI() {
     // Initialize Occam SDK
     handleError(occamInitialize());
 
@@ -259,9 +251,45 @@ int main(int argc, char** argv) {
     char* cid = deviceList->entries[0].cid;
     handleError(occamOpenDevice(cid, &device));
     printf("Opened device: %p\n", device);
-    
+    return std::make_pair(device, deviceList);
+}
 
+void disposeOccamAPI(std::pair<OccamDevice*, OccamDeviceList*> occamAPI) {
+    // Clean up
+    handleError(occamCloseDevice(occamAPI.first));
+    handleError(occamFreeDeviceList(occamAPI.second));
+    handleError(occamShutdown());
+}
 
+// this is the externally facing API function! you want to use this
+void getStitchedAndPointCloud(
+        OccamDevice* device,
+        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pc, 
+        cv::Mat* &cvImage) {
+    void** data = captureStitchedAndPointCloud(device);
+    OccamImage* image = (OccamImage*)data[0];
+    occamImageToCvMat(image, cvImage);
+    handleError(occamFreeImage(image));
+
+    for (int i = 1; i < 6; i++) {
+        OccamPointCloud* occamCloud = (OccamPointCloud*)data[i];
+        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+        int numConverted = convertToPcl(occamCloud, tempCloud);
+        printf("Number of points converted to PCL: %d\n", numConverted);
+
+        // Add to large cloud
+        *pc += *tempCloud;
+    }
+    for (int i = 1; i < 6; i++) {
+        handleError(occamFreePointCloud((OccamPointCloud*)data[i]));
+    }
+}
+
+int main(int argc, char** argv) {
+
+    std::pair<OccamDevice*, OccamDeviceList*> occamAPI = initializeOccamAPI();
+    OccamDevice* device = occamAPI.first;
+    OccamDeviceList* deviceList = occamAPI.second;
     // Initialize viewer
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));
 
@@ -278,41 +306,23 @@ int main(int argc, char** argv) {
 
     int counter = 0;
     // Keep updating point cloud until viewer is stopped
+    cv::Mat* cvImage;
     while(!viewer->wasStopped()) {
         (*cloud).clear();
-        void** data = captureStitchedAndPointCloud(device);
-        OccamImage* image = (OccamImage*)data[0];
-        for (int i = 1; i < 6; i++) {
-            OccamPointCloud* occamCloud = (OccamPointCloud*)data[i];
-            pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-            int numConverted = convertToPcl(occamCloud, tempCloud);
-            printf("Number of points converted to PCL: %d\n", numConverted);
 
-            // Add to large cloud
-            *cloud += *tempCloud;
-        }
+        getStitchedAndPointCloud(device, cloud, cvImage);
+
         savePointCloud(cloud, counter);
-
         std::ostringstream imagename;
         imagename << "data/stitched" << counter << ".jpg";
-        saveImage(image, imagename.str());
+        saveImage(cvImage, imagename.str());
 
-        handleError(occamFreeImage(image));
-        for (int i = 1; i < 6; i++) {
-            handleError(occamFreePointCloud((OccamPointCloud*)data[i]));
-        }
-
-        //capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
         rgb.setInputCloud(cloud);
         viewer->updatePointCloud(cloud, rgb, "cloud");
         viewer->spinOnce();
         ++counter;
     }
-
-    // Clean up
-    handleError(occamCloseDevice(device));
-    handleError(occamFreeDeviceList(deviceList));
-    handleError(occamShutdown());
+    disposeOccamAPI(occamAPI);
 
     return 0;
 }
