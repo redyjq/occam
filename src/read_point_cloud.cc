@@ -240,7 +240,7 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
 void** captureStitchedAndPointCloud(OccamDevice* device) {
     OccamDataName* req = (OccamDataName*)occamAlloc(6*sizeof(OccamDataName));
     req[0] = OCCAM_STITCHED_IMAGE0;
-    req[1] = OCCAM_DISPARITY_IMAGE1;
+    req[1] = OCCAM_POINT_CLOUD0;
     req[2] = OCCAM_POINT_CLOUD1;
     req[3] = OCCAM_POINT_CLOUD2;
     req[4] = OCCAM_POINT_CLOUD3;

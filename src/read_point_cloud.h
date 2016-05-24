@@ -21,3 +21,4 @@ void getStitchedAndPointCloud(
         cv::Mat* &cvImage);
 void saveImage(OccamImage* image, std::string fileName);
 void saveImage(cv::Mat* image, std::string fileName);
+void** captureRgbAndDisparity(OccamDevice* device);
