@@ -200,12 +200,15 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
     // Configure the module with the sensor information
     handleError(rectifyIface->configure(rectifyHandle, sensor_count, sensor_width, sensor_height, Dp, Kp, Rp, Tp, 0));
 
+    printf("i made it here\n");
 
     OccamImage* images = (OccamImage*)captureRgbAndDisparity(device);
+    printf("what happen\n");
     // Get point cloud for the image
-    int indices[] = {0, 1, 2, 3, 4};
-    OccamImage* rgbImages[5];
+    int indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    OccamImage* rgbImages[10];
     OccamImage* disparityImages[5];
+    printf("about to do somethign dangerous\n");
     for (int i = 0; i < 5; i++) {
       rgbImages[i] = &images[i];
       disparityImages[i] = &images[i+5];
@@ -252,22 +255,29 @@ void** captureStitchedAndPointCloud(OccamDevice* device) {
 }
 
 void** captureRgbAndDisparity(OccamDevice* device) {
-    int num_images = 10;
+    printf("capturing rgb and disparity...\n");
+    int num_images = 15;
     OccamDataName* req = (OccamDataName*)occamAlloc(num_images*sizeof(OccamDataName));
     req[0] = OCCAM_IMAGE0;
     req[1] = OCCAM_IMAGE1;
     req[2] = OCCAM_IMAGE2;
     req[3] = OCCAM_IMAGE3;
     req[4] = OCCAM_IMAGE4;
-    req[5] = OCCAM_DISPARITY_IMAGE0;
-    req[6] = OCCAM_DISPARITY_IMAGE1;
-    req[7] = OCCAM_DISPARITY_IMAGE2;
-    req[8] = OCCAM_DISPARITY_IMAGE3;
-    req[9] = OCCAM_DISPARITY_IMAGE4;
+    req[5] = OCCAM_IMAGE5;
+    req[6] = OCCAM_IMAGE6;
+    req[7] = OCCAM_IMAGE7;
+    req[8] = OCCAM_IMAGE8;
+    req[9] = OCCAM_IMAGE9;
+    req[10] = OCCAM_DISPARITY_IMAGE0;
+    req[11] = OCCAM_DISPARITY_IMAGE1;
+    req[12] = OCCAM_DISPARITY_IMAGE2;
+    req[13] = OCCAM_DISPARITY_IMAGE3;
+    req[14] = OCCAM_DISPARITY_IMAGE4;
     OccamDataType returnTypes[] = {OCCAM_IMAGE};
-    //void** data = occamAlloc(sizeof(OccamImage*) + sizeof(OccamPointCloud*));
-    void** data = (void**)occamAlloc(sizeof(void*) * num_images);
+    void** data = (void**)occamAlloc(sizeof(OccamImage*) * num_images);
+    printf("what happen?\n");
     handleError(occamDeviceReadData(device, num_images, req, returnTypes, data, 1));
+    printf("hah it worked");
     return data;
 }
 
@@ -331,9 +341,14 @@ int main(int argc, char** argv) {
     // Initialize viewer
     pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));
 
+
     // Display initial point cloud
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-    //capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+    while (true) {
+        constructPointCloud(device, cloud);
+        printf("captured something\n");
+    }
+    /*
     void** data = captureStitchedAndPointCloud(device);
     OccamImage* image = (OccamImage*)data[0];
     OccamPointCloud* occamCloud = (OccamPointCloud*)data[1];
@@ -348,6 +363,7 @@ int main(int argc, char** argv) {
     while(!viewer->wasStopped()) {
         (*cloud).clear();
 
+        constructPointCloud(device, cloud);
         getStitchedAndPointCloud(device, cloud, cvImage);
 
         savePointCloud(cloud, counter);
@@ -360,6 +376,7 @@ int main(int argc, char** argv) {
         viewer->spinOnce();
         ++counter;
     }
+*/
     disposeOccamAPI(occamAPI);
 
     return 0;
