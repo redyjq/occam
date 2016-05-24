@@ -156,14 +156,14 @@ OccamImage* captureImage(OccamDevice* device, OccamDataName requestType) {
 
 void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
     // Capture RBG image and disparity image
-    OccamImage* rgbImage = captureImage(device, OCCAM_IMAGE2);
-    printf("RGB Image captured at time: %llu\n", (long long unsigned int)rgbImage->time_ns);
-    OccamImage* disparityImage = captureImage(device, OCCAM_DISPARITY_IMAGE1);
-    printf("Disparity Image captured at time: %llu\n", (long long unsigned int)disparityImage->time_ns);
+    //OccamImage* rgbImage = captureImage(device, OCCAM_IMAGE2);
+    //printf("RGB Image captured at time: %llu\n", (long long unsigned int)rgbImage->time_ns);
+    //OccamImage* disparityImage = captureImage(device, OCCAM_DISPARITY_IMAGE1);
+    //printf("Disparity Image captured at time: %llu\n", (long long unsigned int)disparityImage->time_ns);
 
     // Save the images
-    saveImage(rgbImage, "rgbImage.jpg");
-    saveImage(disparityImage, "disparityImage.jpg");
+    //saveImage(rgbImage, "rgbImage.jpg");
+    //saveImage(disparityImage, "disparityImage.jpg");
 
     // Get basic sensor information for the camera
     int sensor_count;
@@ -206,21 +206,36 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
     // Configure the module with the sensor information
     handleError(rectifyIface->configure(rectifyHandle, sensor_count, sensor_width, sensor_height, Dp, Kp, Rp, Tp, 0));
 
+
+    OccamImage* images = (OccamImage*)captureRgbAndDisparity(device);
     // Get point cloud for the image
-    int indices[] = {1};
-    OccamImage* rgbImages[1];
-    rgbImages[0] = rgbImage;
-    OccamImage* disparityImages[1];
-    disparityImages[0] = disparityImage;
-    OccamPointCloud* pointCloud;
-    handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, &pointCloud));
+    int indices[] = {0, 1, 2, 3, 4};
+    OccamImage* rgbImages[5];
+    OccamImage* disparityImages[5];
+    for (int i = 0; i < 5; i++) {
+      rgbImages[i] = images[i];
+      disparityImages[i] = images[i+5];
+    }
+    OccamPointCloud** pointClouds = (OccamPointCloud**)occamAlloc(sizeof(OccamPointCloud*) * 5);
+    handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, pointClouds));
+
+    /* // method signature
+       virtual int generateCloud(int N,const int* indices,int transform,
+			    const OccamImage* const* img0,const OccamImage* const* disp0,
+			    OccamPointCloud** cloud1) = 0;
+     */
 
     // Print statistics
-    printf("Number of points in Occam point cloud: %d\n", pointCloud->point_count);
+    for (int i = 0; i < 5; i++) {
+      printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
+    }
+
+    /*
 
     // Convert to PCL point cloud
     int numConverted = convertToPcl(pointCloud, pclPointCloud);
     printf("Number of points converted to PCL: %d\n", numConverted);
+    */
 
     // Clean up
     handleError(occamFreePointCloud(pointCloud));
@@ -229,7 +244,7 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
 void** captureStitchedAndPointCloud(OccamDevice* device) {
     OccamDataName* req = (OccamDataName*)occamAlloc(6*sizeof(OccamDataName));
     req[0] = OCCAM_STITCHED_IMAGE0;
-    req[1] = OCCAM_POINT_CLOUD0;
+    req[1] = OCCAM_DISPARITY_IMAGE1;
     req[2] = OCCAM_POINT_CLOUD1;
     req[3] = OCCAM_POINT_CLOUD2;
     req[4] = OCCAM_POINT_CLOUD3;
@@ -238,6 +253,26 @@ void** captureStitchedAndPointCloud(OccamDevice* device) {
     //void** data = occamAlloc(sizeof(OccamImage*) + sizeof(OccamPointCloud*));
     void** data = (void**)occamAlloc(sizeof(void*) * 6);
     handleError(occamDeviceReadData(device, 6, req, returnTypes, data, 1));
+    return data;
+}
+
+void** captureRgbAndDisparity(OccamDevice* device) {
+    int num_images = 10;
+    OccamDataName* req = (OccamDataName*)occamAlloc(num_images*sizeof(OccamDataName));
+    req[0] = OCCAM_IMAGE0;
+    req[1] = OCCAM_IMAGE1;
+    req[2] = OCCAM_IMAGE2;
+    req[3] = OCCAM_IMAGE3;
+    req[4] = OCCAM_IMAGE4;
+    req[5] = OCCAM_DISPARITY_IMAGE0;
+    req[6] = OCCAM_DISPARITY_IMAGE1;
+    req[7] = OCCAM_DISPARITY_IMAGE2;
+    req[8] = OCCAM_DISPARITY_IMAGE3;
+    req[9] = OCCAM_DISPARITY_IMAGE4;
+    OccamDataType returnTypes[] = {OCCAM_IMAGE};
+    //void** data = occamAlloc(sizeof(OccamImage*) + sizeof(OccamPointCloud*));
+    void** data = (void**)occamAlloc(sizeof(void*) * num_images);
+    handleError(occamDeviceReadData(device, num_images, req, returnTypes, data, 1));
     return data;
 }
 
