@@ -253,7 +253,7 @@ void** captureStitchedAndPointCloud(OccamDevice* device) {
 
 void** captureRgbAndDisparity(OccamDevice* device) {
   printf("capturing rgb and disparity...\n");
-  int num_images = 15;
+  int num_images = 10;
   OccamDataName* req = (OccamDataName*)occamAlloc(num_images*sizeof(OccamDataName));
   req[0] = OCCAM_IMAGE0;
   req[1] = OCCAM_IMAGE1;
@@ -265,11 +265,11 @@ void** captureRgbAndDisparity(OccamDevice* device) {
   req[7] = OCCAM_IMAGE7;
   req[8] = OCCAM_IMAGE8;
   req[9] = OCCAM_IMAGE9;
-  req[10] = OCCAM_DISPARITY_IMAGE0;
-  req[11] = OCCAM_DISPARITY_IMAGE1;
-  req[12] = OCCAM_DISPARITY_IMAGE2;
-  req[13] = OCCAM_DISPARITY_IMAGE3;
-  req[14] = OCCAM_DISPARITY_IMAGE4;
+  //req[10] = OCCAM_DISPARITY_IMAGE0;
+  //req[11] = OCCAM_DISPARITY_IMAGE1;
+  //req[12] = OCCAM_DISPARITY_IMAGE2;
+  //req[13] = OCCAM_DISPARITY_IMAGE3;
+  //req[14] = OCCAM_DISPARITY_IMAGE4;
   OccamDataType returnTypes[] = {OCCAM_IMAGE};
   void** data = (void**)occamAlloc(sizeof(OccamImage*) * num_images);
   printf("attempting to read rgb&disparity from occam...\n");
