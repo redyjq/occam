@@ -255,16 +255,16 @@ void** captureRgbAndDisparity(OccamDevice* device) {
   printf("capturing rgb and disparity...\n");
   int num_images = 10;
   OccamDataName* req = (OccamDataName*)occamAlloc(num_images*sizeof(OccamDataName));
-  req[0] = OCCAM_IMAGE0;
-  req[1] = OCCAM_IMAGE1;
-  req[2] = OCCAM_IMAGE2;
-  req[3] = OCCAM_IMAGE3;
-  req[4] = OCCAM_IMAGE4;
-  req[5] = OCCAM_IMAGE5;
-  req[6] = OCCAM_IMAGE6;
-  req[7] = OCCAM_IMAGE7;
-  req[8] = OCCAM_IMAGE8;
-  req[9] = OCCAM_IMAGE9;
+  req[0] = OCCAM_RAW_IMAGE0;
+  req[1] = OCCAM_RAW_IMAGE1;
+  req[2] = OCCAM_RAW_IMAGE2;
+  req[3] = OCCAM_RAW_IMAGE3;
+  req[4] = OCCAM_RAW_IMAGE4;
+  req[5] = OCCAM_RAW_IMAGE5;
+  req[6] = OCCAM_RAW_IMAGE6;
+  req[7] = OCCAM_RAW_IMAGE7;
+  req[8] = OCCAM_RAW_IMAGE8;
+  req[9] = OCCAM_RAW_IMAGE9;
   //req[10] = OCCAM_DISPARITY_IMAGE0;
   //req[11] = OCCAM_DISPARITY_IMAGE1;
   //req[12] = OCCAM_DISPARITY_IMAGE2;
@@ -273,7 +273,7 @@ void** captureRgbAndDisparity(OccamDevice* device) {
   OccamDataType returnTypes[] = {OCCAM_IMAGE};
   void** data = (void**)occamAlloc(sizeof(OccamImage*) * num_images);
   printf("attempting to read rgb&disparity from occam...\n");
-  handleError(occamDeviceReadData(device, 10, req, returnTypes, data, 1));
+  handleError(occamDeviceReadData(device, 10, req, 0, data, 1));
   printf("hah it worked");
   return data;
 }
