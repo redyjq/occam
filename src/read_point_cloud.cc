@@ -130,11 +130,10 @@ void captureAllPointClouds(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGB
 
 void visualizePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
   pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer("PCL Viewer"));   
-
-  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(pclPointCloud);             
+  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(pclPointCloud);
   viewer->addPointCloud<pcl::PointXYZRGBA> (pclPointCloud, rgb, "cloud");
   while (!viewer->wasStopped()) {
-    viewer->spinOnce();  
+    viewer->spinOnce();
   }
 }
 
@@ -200,41 +199,36 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
   // Configure the module with the sensor information
   handleError(rectifyIface->configure(rectifyHandle, sensor_count, sensor_width, sensor_height, Dp, Kp, Rp, Tp, 0));
 
-  printf("i made it here\n");
-
   OccamImage* images = (OccamImage*)captureRgbAndDisparity(device);
-  // printf("what happen\n");
-  // // Get point cloud for the image
-  // int indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  // OccamImage* rgbImages[10];
-  // OccamImage* disparityImages[5];
-  // printf("about to do somethign dangerous\n");
-  // // dangerous stuff?
-  // for (int i = 0; i < 5; i++) {
-  //   rgbImages[i] = &images[i];
-  //   disparityImages[i] = &images[i+5];
-  // }
-  // OccamPointCloud** pointClouds = (OccamPointCloud**)occamAlloc(sizeof(OccamPointCloud*) * 5);
-  // handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, pointClouds));
+  // Get point cloud for the image
+  int indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  OccamImage* rgbImages[10];
+  OccamImage* disparityImages[5];
+  for (int i = 0; i < 5; i++) {
+    rgbImages[i] = &images[i];
+    disparityImages[i] = &images[i+5];
+  }
+  OccamPointCloud** pointClouds = (OccamPointCloud**)occamAlloc(sizeof(OccamPointCloud*) * 5);
+  handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, pointClouds));
 
   // method signature
   // virtual int generateCloud(int N,const int* indices,int transform,
   // const OccamImage* const* img0,const OccamImage* const* disp0, OccamPointCloud** cloud1) = 0;
 
+  // Print statistics
+  for (int i = 0; i < 5; i++) {
+    printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
+  }
 
-  // // Print statistics
-  // for (int i = 0; i < 5; i++) {
-  //   printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
-  // }
+  // Convert to PCL point cloud
+  // TODO convert all of them, stitch according to extrinsics
+  int numConverted = convertToPcl(pointClouds[0], pclPointCloud);
+  printf("Number of points converted to PCL: %d\n", numConverted);
 
-  // // Convert to PCL point cloud
-  // int numConverted = convertToPcl(pointCloud, pclPointCloud);
-  // printf("Number of points converted to PCL: %d\n", numConverted);
-
-  // // Clean up
-  // for (int i = 0; i < 5; i++) {
-  //   handleError(occamFreePointCloud(pointClouds[i]));
-  // }
+  // Clean up
+  for (int i = 0; i < 5; i++) {
+    handleError(occamFreePointCloud(pointClouds[i]));
+  }
 }
 
 void** captureStitchedAndPointCloud(OccamDevice* device) {
@@ -345,34 +339,34 @@ int main(int argc, char** argv) {
     printf("captured something\n");
   }
   /*
-  void** data = captureStitchedAndPointCloud(device);
-  OccamImage* image = (OccamImage*)data[0];
-  OccamPointCloud* occamCloud = (OccamPointCloud*)data[1];
-  convertToPcl(occamCloud, cloud);
-  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(cloud);
-  viewer->addPointCloud<pcl::PointXYZRGBA> (cloud, rgb, "cloud");
-  viewer->spinOnce();
+     void** data = captureStitchedAndPointCloud(device);
+     OccamImage* image = (OccamImage*)data[0];
+     OccamPointCloud* occamCloud = (OccamPointCloud*)data[1];
+     convertToPcl(occamCloud, cloud);
+     pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(cloud);
+     viewer->addPointCloud<pcl::PointXYZRGBA> (cloud, rgb, "cloud");
+     viewer->spinOnce();
 
-  int counter = 0;
+     int counter = 0;
   // Keep updating point cloud until viewer is stopped
   cv::Mat* cvImage;
   while(!viewer->wasStopped()) {
-    (*cloud).clear();
+  (*cloud).clear();
 
-    constructPointCloud(device, cloud);
-    getStitchedAndPointCloud(device, cloud, cvImage);
+  constructPointCloud(device, cloud);
+  getStitchedAndPointCloud(device, cloud, cvImage);
 
-    savePointCloud(cloud, counter);
-    std::ostringstream imagename;
-    imagename << "data/stitched" << counter << ".jpg";
-    saveImage(cvImage, imagename.str());
+  savePointCloud(cloud, counter);
+  std::ostringstream imagename;
+  imagename << "data/stitched" << counter << ".jpg";
+  saveImage(cvImage, imagename.str());
 
-    rgb.setInputCloud(cloud);
-    viewer->updatePointCloud(cloud, rgb, "cloud");
-    viewer->spinOnce();
-    ++counter;
+  rgb.setInputCloud(cloud);
+  viewer->updatePointCloud(cloud, rgb, "cloud");
+  viewer->spinOnce();
+  ++counter;
   }
-*/
+  */
   disposeOccamAPI(occamAPI);
 
   return 0;
