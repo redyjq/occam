@@ -206,14 +206,11 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
   printf("what happen\n");
   int indices[] = {1};
   OccamImage* rgbImages[1];
-  rgbImages[0] = rgbImage;
+  rgbImages[0] = images[0];
   OccamImage* disparityImages[1];
-  disparityImages[0] = disparityImage;
+  disparityImages[0] = images[10];
   OccamPointCloud* pointCloud;
-  //OccamPointCloud** pointClouds = (OccamPointCloud**)occamAlloc(sizeof(OccamPointCloud*) * 5);
   // might need to call this once for each cloud
-  //handleError(rectifyIface->generateCloud(
-  //      rectifyHandle, 1, indices, 1, rgbImages, disparityImages, pointClouds));
   handleError(
       rectifyIface->generateCloud(
         rectifyHandle, 1, indices, 1, rgbImages, disparityImages, &pointCloud));
