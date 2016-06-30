@@ -119,8 +119,42 @@ void captureAllPointClouds(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGB
         int numConverted = convertToPcl(pointClouds[i], tempCloud);
         printf("Number of points converted to PCL: %d\n", numConverted);
 
+        // Get sensor extrisics
+        // assuming the index in the pointClouds array corresponds to the index of the sensor??
+        double R[9];
+        handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_ROTATION0 + i), R, 9));
+        double T[3];
+        handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_TRANSLATION0 + i), T, 3));
+
+        // Init transform
+        Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+
+        // Set rotation
+        // assuming the R array is in row major order
+        transform (0,0) = R[0];
+        transform (0,1) = R[1];
+        transform (0,2) = R[2];
+        transform (1,0) = R[3];
+        transform (1,1) = R[4];
+        transform (1,2) = R[5];
+        transform (2,0) = R[6];
+        transform (2,1) = R[7];
+        transform (2,2) = R[8];
+
+        // Set translation
+        transform (0,3) = T[0];
+        transform (1,3) = T[1];
+        transform (2,3) = T[2];
+
+        // printf ("Transform for sensor %d:\n", i-1);
+        // std::cout << transform << std::endl;
+
+        // Transform PCL point cloud
+        pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+        pcl::transformPointCloud (*tempCloud, *transformedCloud, transform);
+
         // Add to large cloud
-        *pclPointCloud += *tempCloud;
+        *pclPointCloud += *transformedCloud;
     }
     printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
 
@@ -173,6 +207,7 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
     double* Rp[sensor_count];
     double* Tp[sensor_count];
 
+    // XXX Rp and Tp are the extrinsics for the occam
     // Get sensor parameters for all sensors
     for (int i = 0; i < sensor_count; ++i) {
         double D[5];
@@ -315,6 +350,7 @@ void getStitchedAndPointCloud(
         int numConverted = convertToPcl(occamCloud, tempCloud);
         printf("Number of points converted to PCL: %d\n", numConverted);
 
+        
         // Add to large cloud
         *pc += *tempCloud;
     }
