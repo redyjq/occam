@@ -220,19 +220,20 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
   //const OccamImage* const* img0,const OccamImage* const* disp0, OccamPointCloud** cloud1) = 0;
 
 
-  // Print statistics
-  for (int i = 0; i < 5; i++) {
-    printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
-  }
+  //// Print statistics
+  //for (int i = 0; i < 5; i++) {
+  //  printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
+  //}
 
   // Convert to PCL point cloud
   int numConverted = convertToPcl(pointCloud, pclPointCloud);
   printf("Number of points converted to PCL: %d\n", numConverted);
 
   // Clean up
-  for (int i = 0; i < 5; i++) {
-    handleError(occamFreePointCloud(pointClouds[i]));
-  }
+  //for (int i = 0; i < 5; i++) {
+  //  handleError(occamFreePointCloud(pointClouds[i]));
+  //}
+  handleError(occamFreePointCloud(pointCloud));
 }
 
 void** captureStitchedAndPointCloud(OccamDevice* device) {
