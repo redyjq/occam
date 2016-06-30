@@ -203,38 +203,39 @@ void constructPointCloud(OccamDevice* device, pcl::PointCloud<pcl::PointXYZRGBA>
   printf("i made it here\n");
 
   OccamImage* images = (OccamImage*)captureRgbAndDisparity(device);
-  // printf("what happen\n");
-  // // Get point cloud for the image
-  // int indices[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  // OccamImage* rgbImages[10];
-  // OccamImage* disparityImages[5];
-  // printf("about to do somethign dangerous\n");
-  // // dangerous stuff?
-  // for (int i = 0; i < 5; i++) {
-  //   rgbImages[i] = &images[i];
-  //   disparityImages[i] = &images[i+5];
-  // }
-  // OccamPointCloud** pointClouds = (OccamPointCloud**)occamAlloc(sizeof(OccamPointCloud*) * 5);
-  // handleError(rectifyIface->generateCloud(rectifyHandle, 1, indices, 1, rgbImages, disparityImages, pointClouds));
+  printf("what happen\n");
+  int indices[] = {1};
+  OccamImage* rgbImages[1];
+  rgbImages[0] = rgbImage;
+  OccamImage* disparityImages[1];
+  disparityImages[0] = disparityImage;
+  OccamPointCloud* pointCloud;
+  //OccamPointCloud** pointClouds = (OccamPointCloud**)occamAlloc(sizeof(OccamPointCloud*) * 5);
+  // might need to call this once for each cloud
+  //handleError(rectifyIface->generateCloud(
+  //      rectifyHandle, 1, indices, 1, rgbImages, disparityImages, pointClouds));
+  handleError(
+      rectifyIface->generateCloud(
+        rectifyHandle, 1, indices, 1, rgbImages, disparityImages, &pointCloud));
 
-  // method signature
-  // virtual int generateCloud(int N,const int* indices,int transform,
-  // const OccamImage* const* img0,const OccamImage* const* disp0, OccamPointCloud** cloud1) = 0;
+  //method signature
+  //virtual int generateCloud(int N,const int* indices,int transform,
+  //const OccamImage* const* img0,const OccamImage* const* disp0, OccamPointCloud** cloud1) = 0;
 
 
-  // // Print statistics
-  // for (int i = 0; i < 5; i++) {
-  //   printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
-  // }
+  // Print statistics
+  for (int i = 0; i < 5; i++) {
+    printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
+  }
 
-  // // Convert to PCL point cloud
-  // int numConverted = convertToPcl(pointCloud, pclPointCloud);
-  // printf("Number of points converted to PCL: %d\n", numConverted);
+  // Convert to PCL point cloud
+  int numConverted = convertToPcl(pointCloud, pclPointCloud);
+  printf("Number of points converted to PCL: %d\n", numConverted);
 
-  // // Clean up
-  // for (int i = 0; i < 5; i++) {
-  //   handleError(occamFreePointCloud(pointClouds[i]));
-  // }
+  // Clean up
+  for (int i = 0; i < 5; i++) {
+    handleError(occamFreePointCloud(pointClouds[i]));
+  }
 }
 
 void** captureStitchedAndPointCloud(OccamDevice* device) {
