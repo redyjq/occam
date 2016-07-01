@@ -421,17 +421,19 @@ int main(int argc, char **argv) {
 
   int counter = 0;
   // Keep updating point cloud until viewer is stopped
-  cv::Mat *cvImage;
+
+  // Intended to store the stitched image.
+  //  cv::Mat *cvImage;
   while (!viewer->wasStopped()) {
     (*cloud).clear();
 
-    //getStitchedAndPointCloud(device, cloud, cvImage);
+    //  getStitchedAndPointCloud(device, cloud, cvImage);
     captureAllPointClouds(device, cloud);
 
     savePointCloud(cloud, counter);
-    std::ostringstream imagename;
-    imagename << "data/stitched" << counter << ".jpg";
-    saveImage(cvImage, imagename.str());
+    //  std::ostringstream imagename;
+    //  imagename << "data/stitched" << counter << ".jpg";
+    //  saveImage(cvImage, imagename.str());
 
     rgb.setInputCloud(cloud);
     viewer->updatePointCloud(cloud, rgb, "cloud");
