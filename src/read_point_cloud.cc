@@ -112,23 +112,20 @@ void capturePointCloud(OccamDevice *device,
 void captureAllPointClouds(
     OccamDevice *device,
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
-  // Initialize variables
-  int i;
-
   // Capture point clouds
   OccamDataName *requestTypes =
       (OccamDataName *)occamAlloc(5 * sizeof(OccamDataName));
-  for (i = 0; i < 5; ++i) {
+  for (int i = 0; i < 5; ++i) {
     requestTypes[i] = (OccamDataName)(OCCAM_POINT_CLOUD0 + i);
   }
   OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
-  OccamPointCloud **pointClouds =
-      (OccamPointCloud **)occamAlloc(5 * sizeof(OccamPointCloud *));
+  OccamPointCloud** pointClouds =
+    (OccamPointCloud**) occamAlloc(5 * sizeof(OccamPointCloud*));
   ;
   handleError(
-      occamDeviceReadData(device, 5, requestTypes, 0, (void **)pointClouds, 1));
+      occamDeviceReadData(device, 5, requestTypes, 0, (void**)pointClouds, 1));
 
-  for (i = 0; i < 5; ++i) {
+  for (int i = 0; i < 5; ++i) {
     // Print statistics
     printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i,
            pointClouds[i]->point_count);
@@ -411,11 +408,12 @@ int main(int argc, char **argv) {
   // Display initial point cloud
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud(
       new pcl::PointCloud<pcl::PointXYZRGBA>);
-  // capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
-  void **data = captureStitchedAndPointCloud(device);
-  OccamImage *image = (OccamImage *)data[0];
-  OccamPointCloud *occamCloud = (OccamPointCloud *)data[1];
-  convertToPcl(occamCloud, cloud);
+  //  capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
+  //  void **data = captureStitchedAndPointCloud(device);
+  //  OccamImage *image = (OccamImage *)data[0];
+  //  OccamPointCloud *occamCloud = (OccamPointCloud *)data[1];
+  //  convertToPcl(occamCloud, cloud);
+  captureAllPointClouds(device, cloud);
   pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(
       cloud);
   viewer->addPointCloud<pcl::PointXYZRGBA>(cloud, rgb, "cloud");
@@ -427,7 +425,8 @@ int main(int argc, char **argv) {
   while (!viewer->wasStopped()) {
     (*cloud).clear();
 
-    getStitchedAndPointCloud(device, cloud, cvImage);
+    //getStitchedAndPointCloud(device, cloud, cvImage);
+    captureAllPointClouds(device, cloud);
 
     savePointCloud(cloud, counter);
     std::ostringstream imagename;
