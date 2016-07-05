@@ -396,11 +396,82 @@ void getStitchedAndPointCloud(OccamDevice *device,
   }
 }
 
+// ######################### ROS ##############################
+geometry_msgs::Pose current_pose;
+bool pose_set = false;
+
+void scaleCloud(
+  double scale, 
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr scaledCloud) {
+
+  // Init transform
+  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+
+  // Set rotation
+  transform (0,0) = scale;
+  transform (1,1) = scale;
+  transform (2,2) = scale;
+
+  // Scale PCL point cloud
+  pcl::transformPointCloud (*cloud, *scaledCloud, transform);
+}
+
+void transformCloudWithPose(
+  geometry_msgs::Pose pose, 
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud) {
+
+  tf::Quaternion q(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
+  // Get a rotation matrix from the quaternion
+  tf::Matrix3x3 m(q);
+
+  // Init transform
+  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+
+  // Set rotation
+  transform (0,0) = m.getRow(0)[0];
+  transform (0,1) = m.getRow(0)[1];
+  transform (0,2) = m.getRow(0)[2];
+  transform (1,0) = m.getRow(1)[0];
+  transform (1,1) = m.getRow(1)[1];
+  transform (1,2) = m.getRow(1)[2];
+  transform (2,0) = m.getRow(2)[0];
+  transform (2,1) = m.getRow(2)[1];
+  transform (2,2) = m.getRow(2)[2];
+
+  // Set translation
+  transform (0,3) = pose.position.x;
+  transform (1,3) = pose.position.y;
+  transform (2,3) = pose.position.z;
+
+  printf ("\nTransform matrix for beam robot odometry:\n");
+  std::cout << transform << std::endl;
+  std::cout << std::endl;
+
+  // Transform PCL point cloud
+  pcl::transformPointCloud (*cloud, *transformedCloud, transform);
+}
+
+void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
+  // Update the pose used to transform the pointcloud
+  current_pose = msg->pose.pose;
+  pose_set = true;
+}
+// ############################################################
+
 int main(int argc, char **argv) {
+    // ######################### ROS ##############################
   // Init ROS node
   ros::init(argc, argv, "beam_occam");
   ros::NodeHandle n;
   printf("Initialized ROS node.\n");
+
+  // Subscribe to odometry data
+  ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
+  // PointCloud2 publisher
+  ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/beam/points", 1);
+  // ############################################################
 
 
   std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
@@ -429,11 +500,39 @@ int main(int argc, char **argv) {
 
   // Intended to store the stitched image.
   //  cv::Mat *cvImage;
-  while (!viewer->wasStopped()) {
+  while (!viewer->wasStopped() && ros::ok()) {
     (*cloud).clear();
 
     //  getStitchedAndPointCloud(device, cloud, cvImage);
     captureAllPointClouds(device, cloud);
+
+
+    // ######################### ROS ##############################
+    if(pose_set) {
+      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+      // use latest odom data to transform PCL point cloud
+      transformCloudWithPose(current_pose, cloud, transformedCloud);
+
+      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr scaledCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+      // use latest odom data to transform PCL point cloud
+      scaleCloud(0.01, transformedCloud, scaledCloud);
+
+      // Convert PCL point cloud to ROS msg
+      sensor_msgs::PointCloud2 pc2;
+      pcl::PCLPointCloud2 tmp_cloud;
+      pcl::toPCLPointCloud2(*scaledCloud, tmp_cloud);
+      pcl_conversions::fromPCL(tmp_cloud, pc2);
+
+      // Publish PointCloud2 to be vizualized in RViz
+      printf ("Converted PCL to PointCloud2!!!\n");
+      // std::cout << pc2 << std::endl;
+      pc2.header.frame_id = "odom";
+      pc2_pub.publish(pc2);
+    }
+    ros::spinOnce();
+    // loop_rate.sleep();
+    // ############################################################
+
 
     // savePointCloud(cloud, counter);
     //  std::ostringstream imagename;

@@ -8,12 +8,18 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl/common/transforms.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/visualization/pcl_visualizer.h>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
-#include <ros/ros.h>
+#include "ros/ros.h"
+#include "nav_msgs/Odometry.h"
+#include "sensor_msgs/PointCloud2.h"
+#include "tf/LinearMath/Matrix3x3.h"
+#include "tf/LinearMath/Quaternion.h"
 
 std::pair<OccamDevice *, OccamDeviceList *> initialize();
 void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI);
