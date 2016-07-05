@@ -397,6 +397,11 @@ void getStitchedAndPointCloud(OccamDevice *device,
 }
 
 int main(int argc, char **argv) {
+  // Init ROS node
+  ros::init(argc, argv, "beam_occam");
+  ros::NodeHandle n;
+  printf("Initialized ROS node.\n");
+
 
   std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
@@ -430,7 +435,7 @@ int main(int argc, char **argv) {
     //  getStitchedAndPointCloud(device, cloud, cvImage);
     captureAllPointClouds(device, cloud);
 
-    savePointCloud(cloud, counter);
+    // savePointCloud(cloud, counter);
     //  std::ostringstream imagename;
     //  imagename << "data/stitched" << counter << ".jpg";
     //  saveImage(cvImage, imagename.str());

@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <ros/ros.h>
 
 std::pair<OccamDevice *, OccamDeviceList *> initialize();
 void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI);
