@@ -112,20 +112,21 @@ void capturePointCloud(OccamDevice *device,
 void captureAllPointClouds(
     OccamDevice *device,
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
-  // Capture point clouds
+  // Capture all point clouds
+    int sensor_count = 5;
   OccamDataName *requestTypes =
-      (OccamDataName *)occamAlloc(5 * sizeof(OccamDataName));
-  for (int i = 0; i < 5; ++i) {
+      (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+  for (int i = 0; i < sensor_count; ++i) {
     requestTypes[i] = (OccamDataName)(OCCAM_POINT_CLOUD0 + i);
   }
   OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
   OccamPointCloud** pointClouds =
-    (OccamPointCloud**) occamAlloc(5 * sizeof(OccamPointCloud*));
+    (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
   ;
   handleError(
-      occamDeviceReadData(device, 5, requestTypes, 0, (void**)pointClouds, 1));
+      occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
 
-  for (int i = 0; i < 5; ++i) {
+  for (int i = 0; i < sensor_count; ++i) {
     // Print statistics
     printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i,
            pointClouds[i]->point_count);
@@ -150,15 +151,14 @@ void captureAllPointClouds(
     Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
 
     // Set rotation
-    // assuming the R array is in row major order
     transform(0, 0) = R[0];
-    transform(0, 1) = R[1];
-    transform(0, 2) = R[2];
-    transform(1, 0) = R[3];
+    transform(1, 0) = R[1];
+    transform(2, 0) = R[2];
+    transform(0, 1) = R[3];
     transform(1, 1) = R[4];
-    transform(1, 2) = R[5];
-    transform(2, 0) = R[6];
-    transform(2, 1) = R[7];
+    transform(2, 1) = R[5];
+    transform(0, 2) = R[6];
+    transform(1, 2) = R[7];
     transform(2, 2) = R[8];
 
     // Set translation
@@ -398,7 +398,7 @@ void getStitchedAndPointCloud(OccamDevice *device,
 
 // ######################### ROS ##############################
 geometry_msgs::Pose current_pose;
-bool pose_set = false;
+bool odom_pose_set = false;
 
 void scaleCloud(
   double scale, 
@@ -445,9 +445,9 @@ void transformCloudWithPose(
   transform (1,3) = pose.position.y;
   transform (2,3) = pose.position.z;
 
-  printf ("\nTransform matrix for beam robot odometry:\n");
-  std::cout << transform << std::endl;
-  std::cout << std::endl;
+  // printf ("\nTransform matrix for beam robot odometry:\n");
+  // std::cout << transform << std::endl;
+  // std::cout << std::endl;
 
   // Transform PCL point cloud
   pcl::transformPointCloud (*cloud, *transformedCloud, transform);
@@ -456,7 +456,7 @@ void transformCloudWithPose(
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   // Update the pose used to transform the pointcloud
   current_pose = msg->pose.pose;
-  pose_set = true;
+  odom_pose_set = true;
 }
 // ############################################################
 
@@ -508,19 +508,30 @@ int main(int argc, char **argv) {
 
 
     // ######################### ROS ##############################
-    if(pose_set) {
-      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-      // use latest odom data to transform PCL point cloud
-      transformCloudWithPose(current_pose, cloud, transformedCloud);
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr scaledCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    // scale the cloud from cm to m
+    scaleCloud(0.01, cloud, scaledCloud);
 
-      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr scaledCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-      // use latest odom data to transform PCL point cloud
-      scaleCloud(0.01, transformedCloud, scaledCloud);
+    // use the transform from the beam robot base to the occam frame to orient the cloud
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr baseFrameCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    geometry_msgs::Pose occam_to_beam_pose;
+    // done so that z axis points up, x axis points forward, y axis points left
+    occam_to_beam_pose.orientation.x = -0.5;
+    occam_to_beam_pose.orientation.y = 0.5;
+    occam_to_beam_pose.orientation.z = -0.5;
+    occam_to_beam_pose.orientation.w = 0.5;
+    // occam_to_beam_pose.position.z = 0.5;
+    transformCloudWithPose(occam_to_beam_pose, scaledCloud, baseFrameCloud);
+
+    if(odom_pose_set) {
+      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr odomFrameCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+      // use latest odom data to transform the cloud with the movement of the robot
+      transformCloudWithPose(current_pose, baseFrameCloud, odomFrameCloud);
 
       // Convert PCL point cloud to ROS msg
       sensor_msgs::PointCloud2 pc2;
       pcl::PCLPointCloud2 tmp_cloud;
-      pcl::toPCLPointCloud2(*scaledCloud, tmp_cloud);
+      pcl::toPCLPointCloud2(*odomFrameCloud, tmp_cloud);
       pcl_conversions::fromPCL(tmp_cloud, pc2);
 
       // Publish PointCloud2 to be vizualized in RViz
