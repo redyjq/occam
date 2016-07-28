@@ -139,10 +139,10 @@ void getSensorExtrisics(OccamDevice *device) {
     transform(1, 3) = T[1];
     transform(2, 3) = T[2];
 
-    printf ("Transform for sensor %d:\n", i-1);
-    std::cout << transform << std::endl;
-
     transforms[i] = transform;
+
+    printf ("Transform for sensor %d:\n", i-1);
+    std::cout << transforms[i] << std::endl;
   }
 }
 
@@ -156,7 +156,10 @@ void captureAllPointClouds(
   }
   OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
   OccamPointCloud** pointClouds = (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
+  clock_t start = clock();
   handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
+  double duration = ( clock() - start ) / (double) CLOCKS_PER_SEC;
+  cout << duration << " #######################################" << endl;
 
   for (int i = 0; i < sensor_count; ++i) {
     // Print statistics
@@ -449,12 +452,8 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     (*cloud).clear();
 
-    // clock_t start = clock();
     //  getStitchedAndPointCloud(device, cloud, cvImage);
     captureAllPointClouds(device, cloud);
-
-    // double duration = ( clock() - start ) / (double) CLOCKS_PER_SEC;
-    // cout << duration << " #######################################" << endl;
 
     // scale the cloud from cm to m
     double scale = 0.01;
