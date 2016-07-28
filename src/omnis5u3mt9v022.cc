@@ -980,6 +980,7 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         const int sensor_width = 752;
         const int sensor_height = 480;
         bool is_color = get_color();
+        // printf("retrieving color image...");
 
         std::shared_ptr<OccamImage> imgout[2];
         int r0 = pair_collect.read(imgout, 2);
