@@ -20,6 +20,7 @@
 #include "sensor_msgs/PointCloud2.h"
 #include "tf/LinearMath/Matrix3x3.h"
 #include "tf/LinearMath/Quaternion.h"
+#include <ctime>
 
 std::pair<OccamDevice *, OccamDeviceList *> initialize();
 void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI);

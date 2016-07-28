@@ -98,48 +98,21 @@ void capturePointCloud(OccamDevice *device,
                                   (void **)&pointCloud, 1));
 
   // Print statistics
-  printf("Number of points in Occam point cloud: %d\n",
-         pointCloud->point_count);
+  // printf("Number of points in Occam point cloud: %d\n", pointCloud->point_count);
 
   // Convert to PCL point cloud
   int numConverted = convertToPcl(pointCloud, pclPointCloud);
-  printf("Number of points converted to PCL: %d\n", numConverted);
+  // printf("Number of points converted to PCL: %d\n", numConverted);
 
   // Clean up
   handleError(occamFreePointCloud(pointCloud));
 }
 
-void captureAllPointClouds(
-    OccamDevice *device,
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
-  // Capture all point clouds
-    int sensor_count = 5;
-  OccamDataName *requestTypes =
-      (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+const int sensor_count = 5;
+Eigen::Matrix4f transforms[sensor_count];
+void getSensorExtrisics(OccamDevice *device) {
   for (int i = 0; i < sensor_count; ++i) {
-    requestTypes[i] = (OccamDataName)(OCCAM_POINT_CLOUD0 + i);
-  }
-  OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
-  OccamPointCloud** pointClouds =
-    (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
-  ;
-  handleError(
-      occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
-
-  for (int i = 0; i < sensor_count; ++i) {
-    // Print statistics
-    printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i,
-           pointClouds[i]->point_count);
-
-    // Convert to PCL point cloud
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud(
-        new pcl::PointCloud<pcl::PointXYZRGBA>);
-    int numConverted = convertToPcl(pointClouds[i], tempCloud);
-    printf("Number of points converted to PCL: %d\n", numConverted);
-
     // Get sensor extrisics
-    // assuming the index in the pointClouds array corresponds to the index of
-    // the sensor??
     double R[9];
     handleError(occamGetDeviceValuerv(
         device, OccamParam(OCCAM_SENSOR_ROTATION0 + i), R, 9));
@@ -166,13 +139,37 @@ void captureAllPointClouds(
     transform(1, 3) = T[1];
     transform(2, 3) = T[2];
 
-    // printf ("Transform for sensor %d:\n", i-1);
-    // std::cout << transform << std::endl;
+    printf ("Transform for sensor %d:\n", i-1);
+    std::cout << transform << std::endl;
 
-    // Transform PCL point cloud
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud(
-        new pcl::PointCloud<pcl::PointXYZRGBA>);
-    pcl::transformPointCloud(*tempCloud, *transformedCloud, transform);
+    transforms[i] = transform;
+  }
+}
+
+void captureAllPointClouds(
+    OccamDevice *device,
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
+  // Capture all point clouds
+  OccamDataName *requestTypes = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+  for (int i = 0; i < sensor_count; ++i) {
+    requestTypes[i] = (OccamDataName)(OCCAM_POINT_CLOUD0 + i);
+  }
+  OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
+  OccamPointCloud** pointClouds = (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
+  handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
+
+  for (int i = 0; i < sensor_count; ++i) {
+    // Print statistics
+    // printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i, pointClouds[i]->point_count);
+
+    // Convert to PCL point cloud
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
+    int numConverted = convertToPcl(pointClouds[i], tempCloud);
+    // printf("Number of points converted to PCL: %d\n", numConverted);
+
+    // Transform PCL point cloud using extrisics
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
+    pcl::transformPointCloud(*tempCloud, *transformedCloud, transforms[i]);
 
     // Add to large cloud
     *pclPointCloud += *transformedCloud;
@@ -290,10 +287,9 @@ void constructPointCloud(
    */
 
   // Print statistics
-  for (int i = 0; i < 5; i++) {
-    printf("Number of points in Occam point cloud: %d\n",
-           pointClouds[i]->point_count);
-  }
+  // for (int i = 0; i < 5; i++) {
+  //   printf("Number of points in Occam point cloud: %d\n", pointClouds[i]->point_count);
+  // }
 
   /*
 
@@ -386,7 +382,7 @@ void getStitchedAndPointCloud(OccamDevice *device,
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud(
         new pcl::PointCloud<pcl::PointXYZRGBA>);
     int numConverted = convertToPcl(occamCloud, tempCloud);
-    printf("Number of points converted to PCL: %d\n", numConverted);
+    // printf("Number of points converted to PCL: %d\n", numConverted);
 
     // Add to large cloud
     *pc += *tempCloud;
@@ -396,32 +392,9 @@ void getStitchedAndPointCloud(OccamDevice *device,
   }
 }
 
-// ######################### ROS ##############################
-geometry_msgs::Pose current_pose;
-bool odom_pose_set = false;
+geometry_msgs::Pose odom_pose;
 
-void scaleCloud(
-  double scale, 
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr scaledCloud) {
-
-  // Init transform
-  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-
-  // Set rotation
-  transform (0,0) = scale;
-  transform (1,1) = scale;
-  transform (2,2) = scale;
-
-  // Scale PCL point cloud
-  pcl::transformPointCloud (*cloud, *scaledCloud, transform);
-}
-
-void transformCloudWithPose(
-  geometry_msgs::Pose pose, 
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud, 
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud) {
-
+Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
   tf::Quaternion q(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
   // Get a rotation matrix from the quaternion
   tf::Matrix3x3 m(q);
@@ -445,75 +418,52 @@ void transformCloudWithPose(
   transform (1,3) = pose.position.y;
   transform (2,3) = pose.position.z;
 
-  // printf ("\nTransform matrix for beam robot odometry:\n");
-  // std::cout << transform << std::endl;
-  // std::cout << std::endl;
-
-  // Transform PCL point cloud
-  pcl::transformPointCloud (*cloud, *transformedCloud, transform);
+  return transform;
 }
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
-  // Update the pose used to transform the pointcloud
-  current_pose = msg->pose.pose;
-  odom_pose_set = true;
+  // Update the pose used to transform the pointcloud to the odom frame
+  odom_pose = msg->pose.pose;
 }
-// ############################################################
 
 int main(int argc, char **argv) {
-    // ######################### ROS ##############################
   // Init ROS node
   ros::init(argc, argv, "beam_occam");
   ros::NodeHandle n;
   printf("Initialized ROS node.\n");
 
+  odom_pose.orientation.w = 1;
   // Subscribe to odometry data
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointCloud2 publisher
   ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/beam/points", 1);
-  // ############################################################
-
 
   std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
   OccamDeviceList *deviceList = occamAPI.second;
-  // Initialize viewer
-  pcl::visualization::PCLVisualizer::Ptr viewer(
-      new pcl::visualization::PCLVisualizer("PCL Viewer"));
 
-  // Display initial point cloud
-  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud(
-      new pcl::PointCloud<pcl::PointXYZRGBA>);
-  //  capturePointCloud(device, cloud, OCCAM_POINT_CLOUD1);
-  //  void **data = captureStitchedAndPointCloud(device);
-  //  OccamImage *image = (OccamImage *)data[0];
-  //  OccamPointCloud *occamCloud = (OccamPointCloud *)data[1];
-  //  convertToPcl(occamCloud, cloud);
-  captureAllPointClouds(device, cloud);
-  pcl::visualization::PointCloudColorHandlerRGBField<pcl::PointXYZRGBA> rgb(
-      cloud);
-  viewer->addPointCloud<pcl::PointXYZRGBA>(cloud, rgb, "cloud");
-  viewer->spinOnce();
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
+  getSensorExtrisics(device);
 
   int counter = 0;
-  // Keep updating point cloud until viewer is stopped
-
-  // Intended to store the stitched image.
-  //  cv::Mat *cvImage;
-  while (!viewer->wasStopped() && ros::ok()) {
+  while (ros::ok()) {
     (*cloud).clear();
 
+    // clock_t start = clock();
     //  getStitchedAndPointCloud(device, cloud, cvImage);
     captureAllPointClouds(device, cloud);
 
+    // double duration = ( clock() - start ) / (double) CLOCKS_PER_SEC;
+    // cout << duration << " #######################################" << endl;
 
-    // ######################### ROS ##############################
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr scaledCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
     // scale the cloud from cm to m
-    scaleCloud(0.01, cloud, scaledCloud);
+    double scale = 0.01;
+    Eigen::Matrix4f scale_transform = Eigen::Matrix4f::Identity();
+    scale_transform (0,0) = scale;
+    scale_transform (1,1) = scale;
+    scale_transform (2,2) = scale;
 
     // use the transform from the beam robot base to the occam frame to orient the cloud
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr baseFrameCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
     geometry_msgs::Pose occam_to_beam_pose;
     // done so that z axis points up, x axis points forward, y axis points left
     occam_to_beam_pose.orientation.x = -0.5;
@@ -521,38 +471,35 @@ int main(int argc, char **argv) {
     occam_to_beam_pose.orientation.z = -0.5;
     occam_to_beam_pose.orientation.w = 0.5;
     // occam_to_beam_pose.position.z = 0.5;
-    transformCloudWithPose(occam_to_beam_pose, scaledCloud, baseFrameCloud);
+    Eigen::Matrix4f occam_to_beam_transform = transform_from_pose(occam_to_beam_pose);
 
-    if(odom_pose_set) {
-      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr odomFrameCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-      // use latest odom data to transform the cloud with the movement of the robot
-      transformCloudWithPose(current_pose, baseFrameCloud, odomFrameCloud);
+    // use latest odom data to transform the cloud with the movement of the robot
+    // if no odom recieved, assume identity transform
+    Eigen::Matrix4f beam_odom_transform = Eigen::Matrix4f::Identity();
+    beam_odom_transform = transform_from_pose(odom_pose);
 
-      // Convert PCL point cloud to ROS msg
-      sensor_msgs::PointCloud2 pc2;
-      pcl::PCLPointCloud2 tmp_cloud;
-      pcl::toPCLPointCloud2(*odomFrameCloud, tmp_cloud);
-      pcl_conversions::fromPCL(tmp_cloud, pc2);
+    // combine all the transforms and then apply to the cloud
+    Eigen::Matrix4f combined_transform = beam_odom_transform * occam_to_beam_transform * scale_transform;
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    pcl::transformPointCloud (*cloud, *transformedCloud, combined_transform);
 
-      // Publish PointCloud2 to be vizualized in RViz
-      printf ("Converted PCL to PointCloud2!!!\n");
-      // std::cout << pc2 << std::endl;
-      pc2.header.frame_id = "odom";
-      pc2_pub.publish(pc2);
-    }
+    // Convert PCL point cloud to PointCloud2 ROS msg
+    sensor_msgs::PointCloud2 pc2;
+    pcl::PCLPointCloud2 tmp_cloud;
+    pcl::toPCLPointCloud2(*transformedCloud, tmp_cloud);
+    pcl_conversions::fromPCL(tmp_cloud, pc2);
+
+    // Publish PointCloud2 to be vizualized in RViz
+    // printf ("Converted PCL to PointCloud2!!!\n");
+    pc2.header.frame_id = "odom";
+    pc2_pub.publish(pc2);
+
     ros::spinOnce();
-    // loop_rate.sleep();
-    // ############################################################
-
 
     // savePointCloud(cloud, counter);
     //  std::ostringstream imagename;
     //  imagename << "data/stitched" << counter << ".jpg";
     //  saveImage(cvImage, imagename.str());
-
-    rgb.setInputCloud(cloud);
-    viewer->updatePointCloud(cloud, rgb, "cloud");
-    viewer->spinOnce();
     ++counter;
   }
   disposeOccamAPI(occamAPI);
