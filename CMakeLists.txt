@@ -50,3 +50,5 @@ add_executable(point_cloud_from_disparity src/point_cloud_from_disparity.cc)
 target_link_libraries(point_cloud_from_disparity indigo ${PCL_LIBRARIES} ${OPENGL_LIBRARIES})
 
 target_link_libraries(occam ${catkin_LIBRARIES})
+
+set(CMAKE_BUILD_TYPE Release)

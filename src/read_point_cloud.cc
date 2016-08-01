@@ -109,7 +109,7 @@ void capturePointCloud(OccamDevice *device,
 }
 
 const int sensor_count = 5;
-Eigen::Matrix4f transforms[sensor_count];
+Eigen::Matrix4f extrisic_transforms[sensor_count];
 void getSensorExtrisics(OccamDevice *device) {
   for (int i = 0; i < sensor_count; ++i) {
     // Get sensor extrisics
@@ -139,10 +139,10 @@ void getSensorExtrisics(OccamDevice *device) {
     transform(1, 3) = T[1];
     transform(2, 3) = T[2];
 
-    transforms[i] = transform;
+    extrisic_transforms[i] = transform;
 
     printf ("Transform for sensor %d:\n", i-1);
-    std::cout << transforms[i] << std::endl;
+    std::cout << extrisic_transforms[i] << std::endl;
   }
 }
 
@@ -156,11 +156,9 @@ void captureAllPointClouds(
   }
   OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
   OccamPointCloud** pointClouds = (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
-  clock_t start = clock();
   handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
-  double duration = ( clock() - start ) / (double) CLOCKS_PER_SEC;
-  cout << duration << " #######################################" << endl;
 
+  // clock_t start = clock();
   for (int i = 0; i < sensor_count; ++i) {
     // Print statistics
     // printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i, pointClouds[i]->point_count);
@@ -172,11 +170,12 @@ void captureAllPointClouds(
 
     // Transform PCL point cloud using extrisics
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
-    pcl::transformPointCloud(*tempCloud, *transformedCloud, transforms[i]);
+    pcl::transformPointCloud(*tempCloud, *transformedCloud, extrisic_transforms[i]);
 
     // Add to large cloud
     *pclPointCloud += *transformedCloud;
   }
+  // cout << ( clock() - start ) / (double) CLOCKS_PER_SEC << " #######################################" << endl;
   printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
 
   // Clean up
