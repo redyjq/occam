@@ -174,6 +174,7 @@ Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
 }
 
 Eigen::Matrix4f occam_to_beam_and_scale_transform;
+Eigen::Matrix4f beam_odom_transform;
 void initTransforms() {
   // scale the cloud from cm to m
   double scale = 0.01;
@@ -195,14 +196,16 @@ void initTransforms() {
 
   // combine the transforms
   occam_to_beam_and_scale_transform = occam_to_beam_transform * scale_transform;
+
+  // if no odom recieved, assume identity transform
+  beam_odom_transform = Eigen::Matrix4f::Identity();
+
   printf("Initialized Transforms.\n");
 }
 
-geometry_msgs::Pose odom_pose;
-
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
-  // Update the pose used to transform the pointcloud to the odom frame
-  odom_pose = msg->pose.pose;
+  // Update the matrix used to transform the pointcloud to the odom frame
+  beam_odom_transform = transform_from_pose(msg->pose.pose);  
 }
 
 void captureAllPointClouds(
@@ -218,10 +221,7 @@ void captureAllPointClouds(
   handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
 
   // use latest odom data to transform the cloud with the movement of the robot
-  // if no odom recieved, assume identity transform
-  Eigen::Matrix4f beam_odom_transform = Eigen::Matrix4f::Identity();
-  beam_odom_transform = transform_from_pose(odom_pose);  
-  Eigen::Matrix4f combined_minus_extrinsic_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
+  Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
     // Print statistics
     // printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i, pointClouds[i]->point_count);
@@ -232,7 +232,7 @@ void captureAllPointClouds(
     // printf("Number of points converted to PCL: %d\n", numConverted);
 
     // combine extrisic transform and then apply to the cloud
-    Eigen::Matrix4f combined_transform = combined_minus_extrinsic_transform * extrisic_transforms[i];
+    Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
     pcl::transformPointCloud (*tempCloud, *transformedCloud, combined_transform);
 
@@ -463,7 +463,6 @@ int main(int argc, char **argv) {
   ros::NodeHandle n;
   printf("Initialized ROS node.\n");
 
-  odom_pose.orientation.w = 1;
   // Subscribe to odometry data
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointCloud2 publisher
