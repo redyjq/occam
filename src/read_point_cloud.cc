@@ -208,18 +208,9 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   beam_odom_transform = transform_from_pose(msg->pose.pose);  
 }
 
-void captureAllPointClouds(
-    OccamDevice *device,
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
-  // Capture all point clouds
-  OccamDataName *requestTypes = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
-  for (int i = 0; i < sensor_count; ++i) {
-    requestTypes[i] = (OccamDataName)(OCCAM_POINT_CLOUD0 + i);
-  }
-  OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
-  OccamPointCloud** pointClouds = (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
-  handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
-
+void occamCloudsToPCL(
+  OccamPointCloud** pointClouds,
+  pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
   // use latest odom data to transform the cloud with the movement of the robot
   Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
@@ -240,9 +231,18 @@ void captureAllPointClouds(
     *pclPointCloud += *transformedCloud;
   }
   printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
+}
 
-  // Clean up
-  occamFree(pointClouds);
+OccamPointCloud** captureAllOccamClouds(OccamDevice *device) {
+  // Capture all point clouds
+  OccamDataName *requestTypes = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+  for (int i = 0; i < sensor_count; ++i) {
+    requestTypes[i] = (OccamDataName)(OCCAM_POINT_CLOUD0 + i);
+  }
+  OccamDataType returnTypes[] = {OCCAM_POINT_CLOUD};
+  OccamPointCloud** pointClouds = (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
+  handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
+  return pointClouds;
 }
 
 void visualizePointCloud(
@@ -477,12 +477,30 @@ int main(int argc, char **argv) {
   initSensorExtrisics(device);
   initTransforms();
 
+  // Capture Rate Test
+  // ros::Rate loop_rate(5);
+  // while (ros::ok()) {
+  //   clock_t start = clock();
+  //   printf("captureAllOccamClouds\n");
+  //   OccamPointCloud** occamClouds = captureAllOccamClouds(device);
+  //   occamFree(occamClouds);
+  //   ros::spinOnce();
+  //   loop_rate.sleep();
+  //   cout << ( clock() - start ) / (double) CLOCKS_PER_SEC << " #######################################" << endl;
+  // }
+
   int counter = 0;
   while (ros::ok()) {
     (*cloud).clear();
 
     //  getStitchedAndPointCloud(device, cloud, cvImage);
-    captureAllPointClouds(device, cloud);
+
+    // Capture all occam clouds to one PCL cloud
+    OccamPointCloud** occamClouds = captureAllOccamClouds(device);
+    // transform and convert
+    occamCloudsToPCL(occamClouds, cloud);
+    // Clean up
+    occamFree(occamClouds);
 
     // Convert PCL point cloud to PointCloud2 ROS msg
     sensor_msgs::PointCloud2 pc2;
