@@ -146,6 +146,65 @@ void initSensorExtrisics(OccamDevice *device) {
   }
 }
 
+Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
+  tf::Quaternion q(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
+  // Get a rotation matrix from the quaternion
+  tf::Matrix3x3 m(q);
+
+  // Init transform
+  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
+
+  // Set rotation
+  transform (0,0) = m.getRow(0)[0];
+  transform (0,1) = m.getRow(0)[1];
+  transform (0,2) = m.getRow(0)[2];
+  transform (1,0) = m.getRow(1)[0];
+  transform (1,1) = m.getRow(1)[1];
+  transform (1,2) = m.getRow(1)[2];
+  transform (2,0) = m.getRow(2)[0];
+  transform (2,1) = m.getRow(2)[1];
+  transform (2,2) = m.getRow(2)[2];
+
+  // Set translation
+  transform (0,3) = pose.position.x;
+  transform (1,3) = pose.position.y;
+  transform (2,3) = pose.position.z;
+
+  return transform;
+}
+
+Eigen::Matrix4f occam_to_beam_and_scale_transform;
+void initTransforms() {
+  // scale the cloud from cm to m
+  double scale = 0.01;
+  Eigen::Matrix4f scale_transform = Eigen::Matrix4f::Identity();
+  scale_transform (0,0) = scale;
+  scale_transform (1,1) = scale;
+  scale_transform (2,2) = scale;
+
+  // use the transform from the beam robot base to the occam frame to orient the cloud
+  geometry_msgs::Pose occam_to_beam_pose;
+  // done so that z axis points up, x axis points forward, y axis points left
+  occam_to_beam_pose.orientation.x = -0.5;
+  occam_to_beam_pose.orientation.y = 0.5;
+  occam_to_beam_pose.orientation.z = -0.5;
+  occam_to_beam_pose.orientation.w = 0.5;
+  // occam_to_beam_pose.orientation.w = 1.0;
+  // occam_to_beam_pose.position.z = 0.5;  
+  Eigen::Matrix4f occam_to_beam_transform = transform_from_pose(occam_to_beam_pose);
+
+  // combine the transforms
+  occam_to_beam_and_scale_transform = occam_to_beam_transform * scale_transform;
+  printf("Initialized Transforms.\n");
+}
+
+geometry_msgs::Pose odom_pose;
+
+void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
+  // Update the pose used to transform the pointcloud to the odom frame
+  odom_pose = msg->pose.pose;
+}
+
 void captureAllPointClouds(
     OccamDevice *device,
     pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
@@ -158,7 +217,11 @@ void captureAllPointClouds(
   OccamPointCloud** pointClouds = (OccamPointCloud**) occamAlloc(sensor_count * sizeof(OccamPointCloud*));
   handleError(occamDeviceReadData(device, sensor_count, requestTypes, 0, (void**)pointClouds, 1));
 
-  // clock_t start = clock();
+  // use latest odom data to transform the cloud with the movement of the robot
+  // if no odom recieved, assume identity transform
+  Eigen::Matrix4f beam_odom_transform = Eigen::Matrix4f::Identity();
+  beam_odom_transform = transform_from_pose(odom_pose);  
+  Eigen::Matrix4f combined_minus_extrinsic_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
     // Print statistics
     // printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i, pointClouds[i]->point_count);
@@ -168,14 +231,14 @@ void captureAllPointClouds(
     int numConverted = convertToPcl(pointClouds[i], tempCloud);
     // printf("Number of points converted to PCL: %d\n", numConverted);
 
-    // Transform PCL point cloud using extrisics
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
-    pcl::transformPointCloud(*tempCloud, *transformedCloud, extrisic_transforms[i]);
+    // combine extrisic transform and then apply to the cloud
+    Eigen::Matrix4f combined_transform = combined_minus_extrinsic_transform * extrisic_transforms[i];
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    pcl::transformPointCloud (*tempCloud, *transformedCloud, combined_transform);
 
     // Add to large cloud
     *pclPointCloud += *transformedCloud;
   }
-  // cout << ( clock() - start ) / (double) CLOCKS_PER_SEC << " #######################################" << endl;
   printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
 
   // Clean up
@@ -394,64 +457,6 @@ void getStitchedAndPointCloud(OccamDevice *device,
   }
 }
 
-geometry_msgs::Pose odom_pose;
-
-Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
-  tf::Quaternion q(pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
-  // Get a rotation matrix from the quaternion
-  tf::Matrix3x3 m(q);
-
-  // Init transform
-  Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
-
-  // Set rotation
-  transform (0,0) = m.getRow(0)[0];
-  transform (0,1) = m.getRow(0)[1];
-  transform (0,2) = m.getRow(0)[2];
-  transform (1,0) = m.getRow(1)[0];
-  transform (1,1) = m.getRow(1)[1];
-  transform (1,2) = m.getRow(1)[2];
-  transform (2,0) = m.getRow(2)[0];
-  transform (2,1) = m.getRow(2)[1];
-  transform (2,2) = m.getRow(2)[2];
-
-  // Set translation
-  transform (0,3) = pose.position.x;
-  transform (1,3) = pose.position.y;
-  transform (2,3) = pose.position.z;
-
-  return transform;
-}
-
-void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
-  // Update the pose used to transform the pointcloud to the odom frame
-  odom_pose = msg->pose.pose;
-}
-
-Eigen::Matrix4f occam_to_beam_and_scale_transform;
-void initTransforms() {
-  // scale the cloud from cm to m
-  double scale = 0.01;
-  Eigen::Matrix4f scale_transform = Eigen::Matrix4f::Identity();
-  scale_transform (0,0) = scale;
-  scale_transform (1,1) = scale;
-  scale_transform (2,2) = scale;
-
-  // use the transform from the beam robot base to the occam frame to orient the cloud
-  geometry_msgs::Pose occam_to_beam_pose;
-  // done so that z axis points up, x axis points forward, y axis points left
-  occam_to_beam_pose.orientation.x = -0.5;
-  occam_to_beam_pose.orientation.y = 0.5;
-  occam_to_beam_pose.orientation.z = -0.5;
-  occam_to_beam_pose.orientation.w = 0.5;
-  // occam_to_beam_pose.position.z = 0.5;  
-  Eigen::Matrix4f occam_to_beam_transform = transform_from_pose(occam_to_beam_pose);
-
-  // combine the transforms
-  occam_to_beam_and_scale_transform = occam_to_beam_transform * scale_transform;
-  printf("Initialized Transforms.\n");
-}
-
 int main(int argc, char **argv) {
   // Init ROS node
   ros::init(argc, argv, "beam_occam");
@@ -480,19 +485,10 @@ int main(int argc, char **argv) {
     //  getStitchedAndPointCloud(device, cloud, cvImage);
     captureAllPointClouds(device, cloud);
 
-    // use latest odom data to transform the cloud with the movement of the robot
-    // if no odom recieved, assume identity transform
-    Eigen::Matrix4f beam_odom_transform = Eigen::Matrix4f::Identity();
-    beam_odom_transform = transform_from_pose(odom_pose);  
-    // combine all the transforms and then apply to the cloud
-    Eigen::Matrix4f combined_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
-    pcl::transformPointCloud (*cloud, *transformedCloud, combined_transform);
-
     // Convert PCL point cloud to PointCloud2 ROS msg
     sensor_msgs::PointCloud2 pc2;
     pcl::PCLPointCloud2 tmp_cloud;
-    pcl::toPCLPointCloud2(*transformedCloud, tmp_cloud);
+    pcl::toPCLPointCloud2(*cloud, tmp_cloud);
     pcl_conversions::fromPCL(tmp_cloud, pc2);
 
     // Publish PointCloud2 to be vizualized in RViz
