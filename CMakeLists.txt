@@ -8,6 +8,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  image_transport
+  cv_bridge
 )
 
 set(OpenCV_DIR "/home/rpal/opencv/build")
