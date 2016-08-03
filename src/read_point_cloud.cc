@@ -521,18 +521,18 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     (*cloud).clear();
 
-    // cv::Mat *cvImage;
-    // getStitchedAndPointCloud(device, cloud, cvImage);
+    cv::Mat *cvImage;
+    getStitchedAndPointCloud(device, cloud, cvImage);
 
     // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *cvImage).toImageMsg();
     // stitched_pub.publish(msg);
 
-    // Capture all occam clouds to one PCL cloud
-    OccamPointCloud** occamClouds = captureAllOccamClouds(device);
-    // transform and convert
-    occamCloudsToPCL(occamClouds, cloud);
-    // Clean up
-    occamFree(occamClouds);
+    // // Capture all occam clouds to one PCL cloud
+    // OccamPointCloud** occamClouds = captureAllOccamClouds(device);
+    // // transform and convert
+    // occamCloudsToPCL(occamClouds, cloud);
+    // // Clean up
+    // occamFree(occamClouds);
 
     // Convert PCL point cloud to PointCloud2 ROS msg
     sensor_msgs::PointCloud2 pc2;
