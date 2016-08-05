@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   image_transport
-  cv_bridge
+  #cv_bridge
 )
 
 set(OpenCV_DIR "/home/rpal/opencv/build")
@@ -53,4 +53,5 @@ target_link_libraries(point_cloud_from_disparity indigo ${PCL_LIBRARIES} ${OPENG
 
 target_link_libraries(occam ${catkin_LIBRARIES})
 
-set(CMAKE_BUILD_TYPE Release)
+#set(CMAKE_BUILD_TYPE Release)
+#set(CMAKE_BUILD_TYPE Debug)
