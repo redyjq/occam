@@ -1,26 +1,11 @@
 cmake_minimum_required(VERSION 2.8)
 project(occam)
 
-find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
-  nav_msgs
-  roscpp
-  rospy
-  sensor_msgs
-  std_msgs
-  image_transport
-  #cv_bridge
-)
-
 set(OpenCV_DIR "/home/rpal/opencv/build")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
 set(CMAKE_SWIG_OUTDIR "${CMAKE_BINARY_DIR}/bin")
 
 add_executable(occam src/read_point_cloud.cc)
-
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
 
 include(FindOpenCV.cmake)
 include_directories(${OpenCV2_INCLUDE_DIRS} ${OpenCV_DIR})
@@ -51,7 +36,25 @@ target_link_libraries(occam indigo)
 add_executable(point_cloud_from_disparity src/point_cloud_from_disparity.cc)
 target_link_libraries(point_cloud_from_disparity indigo ${PCL_LIBRARIES} ${OPENGL_LIBRARIES})
 
+find_package(catkin REQUIRED COMPONENTS
+  geometry_msgs
+  nav_msgs
+  roscpp
+  rospy
+  sensor_msgs
+  std_msgs
+  image_transport
+  #cv_bridge
+)
+
+include_directories(
+  ${catkin_INCLUDE_DIRS}
+)
 target_link_libraries(occam ${catkin_LIBRARIES})
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cv_bridge)
+add_subdirectory(cv_bridge)
+target_link_libraries(occam cv_bridge)
 
 #set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_BUILD_TYPE Debug)

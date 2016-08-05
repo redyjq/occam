@@ -434,52 +434,38 @@ void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI) {
 }
 
 void getStitchedAndPointCloud(OccamDevice *device,
-                              pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pc,
+                              pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud,
                               cv::Mat *&cvImage) {
   void **data = captureStitchedAndPointCloud(device);
   OccamImage *image = (OccamImage *)data[0];
   occamImageToCvMat(image, cvImage);
   handleError(occamFreeImage(image));
 
-  for (int i = 1; i < 6; i++) {
-    OccamPointCloud *occamCloud = (OccamPointCloud *)data[i];
-    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud(
-        new pcl::PointCloud<pcl::PointXYZRGBA>);
+  // use latest odom data to transform the cloud with the movement of the robot
+  Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
+  for (int i = 0; i < sensor_count; ++i) {
+    OccamPointCloud *occamCloud = (OccamPointCloud *)data[i+1];
+    // Print statistics
+    // printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i, occamCloud->point_count);
+
+    // Convert to PCL point cloud
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr tempCloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
     int numConverted = convertToPcl(occamCloud, tempCloud);
     // printf("Number of points converted to PCL: %d\n", numConverted);
 
+    // combine extrisic transform and then apply to the cloud
+    Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
+    pcl::PointCloud<pcl::PointXYZRGBA>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZRGBA>);
+    pcl::transformPointCloud (*tempCloud, *transformedCloud, combined_transform);
+
     // Add to large cloud
-    *pc += *tempCloud;
+    *pclPointCloud += *transformedCloud;
   }
-  for (int i = 1; i < 6; i++) {
-    handleError(occamFreePointCloud((OccamPointCloud *)data[i]));
+  for (int i = 0; i < sensor_count; ++i) {
+    handleError(occamFreePointCloud((OccamPointCloud *)data[i+1]));
   }
+  printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
 }
-
-// // this is the externally facing API function! you want to use this
-// void getStitchedAndPointCloud(OccamDevice *device,
-//                               pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pc,
-//                               cv::Mat *&cvImage) {
-//   void **data = captureStitchedAndPointCloud(device);
-//   OccamImage *image = (OccamImage *)data[0];
-//   occamImageToCvMat(image, cvImage);
-//   handleError(occamFreeImage(image));
-
-//   // Capture all occam clouds to one PCL cloud
-//   OccamPointCloud** occamClouds = (OccamPointCloud**) occamAlloc(5 * sizeof(OccamPointCloud*));
-//   // OccamPointCloud** occamClouds;
-//   for (int i = 1; i < 6; i++) {
-//     occamClouds[i-1] = (OccamPointCloud *)data[i];
-//   }
-//   // transform and convert
-//   occamCloudsToPCL(occamClouds, pc);
-  
-//   // Clean up
-//   // occamFree(occamClouds);
-//   for (int i = 1; i < 6; i++) {
-//     handleError(occamFreePointCloud((OccamPointCloud *)data[i]));
-//   }
-// }
 
 int main(int argc, char **argv) {
   // Init ROS node
@@ -490,11 +476,11 @@ int main(int argc, char **argv) {
   // Subscribe to odometry data
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointCloud2 publisher
-  ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/beam/points", 1);
+  ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/occam/points", 1);
 
   // image_transport::ImageTransport it(n);
   // image_transport::Publisher pub = it.advertise("camera/image", 1);
-  // ros::Publisher stitched_pub = n.advertise<sensor_msgs::Image>("/occam/stitched", 1);
+  ros::Publisher stitched_pub = n.advertise<sensor_msgs::Image>("/occam/stitched", 1);
 
   std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
@@ -517,15 +503,15 @@ int main(int argc, char **argv) {
   //   cout << ( clock() - start ) / (double) CLOCKS_PER_SEC << " #######################################" << endl;
   // }
   
+  cv::Mat *cvImage;
   int counter = 0;
   while (ros::ok()) {
     (*cloud).clear();
 
-    cv::Mat *cvImage;
     getStitchedAndPointCloud(device, cloud, cvImage);
 
-    // sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *cvImage).toImageMsg();
-    // stitched_pub.publish(msg);
+    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *cvImage).toImageMsg();
+    stitched_pub.publish(msg);
 
     // // Capture all occam clouds to one PCL cloud
     // OccamPointCloud** occamClouds = captureAllOccamClouds(device);
