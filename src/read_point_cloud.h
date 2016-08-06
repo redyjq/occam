@@ -25,6 +25,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
 #include <image_transport/image_transport.h>
+#include <beam_joy/PointcloudAndImage.h>
 
 std::pair<OccamDevice *, OccamDeviceList *> initialize();
 void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI);

@@ -45,6 +45,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   image_transport
   #cv_bridge
+  beam_joy
 )
 
 include_directories(

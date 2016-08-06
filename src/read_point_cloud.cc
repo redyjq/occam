@@ -193,6 +193,7 @@ void initTransforms() {
   // occam_to_beam_pose.orientation.w = 1.0;
   // occam_to_beam_pose.position.z = 0.5;  
   Eigen::Matrix4f occam_to_beam_transform = transform_from_pose(occam_to_beam_pose);
+  // Eigen::Matrix4f occam_to_beam_transform = Eigen::Matrix4f::Identity();
 
   // combine the transforms
   occam_to_beam_and_scale_transform = occam_to_beam_transform * scale_transform;
@@ -477,6 +478,7 @@ int main(int argc, char **argv) {
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointCloud2 publisher
   ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/occam/points", 1);
+  ros::Publisher pc2_and_stitched_pub = n.advertise<beam_joy::PointcloudAndImage>("/occam/points_and_stitched", 1);
 
   // image_transport::ImageTransport it(n);
   // image_transport::Publisher pub = it.advertise("camera/image", 1);
@@ -510,33 +512,26 @@ int main(int argc, char **argv) {
 
     getStitchedAndPointCloud(device, cloud, cvImage);
 
-    sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *cvImage).toImageMsg();
-    stitched_pub.publish(msg);
+    // Convert cvImage to ROS Image msg and publish
+    sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *cvImage).toImageMsg();
+    stitched_pub.publish(img_msg);
 
-    // // Capture all occam clouds to one PCL cloud
-    // OccamPointCloud** occamClouds = captureAllOccamClouds(device);
-    // // transform and convert
-    // occamCloudsToPCL(occamClouds, cloud);
-    // // Clean up
-    // occamFree(occamClouds);
-
-    // Convert PCL point cloud to PointCloud2 ROS msg
+    // Convert PCL pointcloud to ROS PointCloud2 msg and publish
     sensor_msgs::PointCloud2 pc2;
     pcl::PCLPointCloud2 tmp_cloud;
     pcl::toPCLPointCloud2(*cloud, tmp_cloud);
     pcl_conversions::fromPCL(tmp_cloud, pc2);
-
-    // Publish PointCloud2 to be vizualized in RViz
-    // printf ("Converted PCL to PointCloud2!!!\n");
     pc2.header.frame_id = "odom";
     pc2_pub.publish(pc2);
 
+    // Init PointcloudAndImage msg
+    beam_joy::PointcloudAndImage pc_img_msg;
+    pc_img_msg.pc = pc2;
+    pc_img_msg.img = *img_msg;
+    pc2_and_stitched_pub.publish(pc_img_msg);
+
     ros::spinOnce();
 
-    // savePointCloud(cloud, counter);
-    //  std::ostringstream imagename;
-    //  imagename << "data/stitched" << counter << ".jpg";
-    //  saveImage(cvImage, imagename.str());
     ++counter;
   }
   disposeOccamAPI(occamAPI);
