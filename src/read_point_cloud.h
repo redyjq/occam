@@ -29,9 +29,8 @@
 
 std::pair<OccamDevice *, OccamDeviceList *> initialize();
 void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI);
-void getStitchedAndPointCloud(OccamDevice *device,
-                              pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pc,
-                              cv::Mat *&cvImage);
+cv::Mat getStitchedAndPointCloud(OccamDevice *device,
+                              pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pc);
 void saveImage(OccamImage *image, std::string fileName);
 void saveImage(cv::Mat *image, std::string fileName);
 void **captureRgbAndDisparity(OccamDevice *device);

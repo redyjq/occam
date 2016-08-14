@@ -57,7 +57,9 @@ void savePointCloud(pcl::PointCloud<pcl::PointXYZRGBA>::Ptr point_cloud,
   }
 }
 
-void occamImageToCvMat(OccamImage *&image, cv::Mat *&cvImage) {
+cv::Mat occamImageToCvMat(OccamImage *image) {
+  cv::Mat *cvImage;
+  cv::Mat colorImage;
   if (image && image->format == OCCAM_GRAY8) {
     cvImage = new cv::Mat_<uchar>(image->height, image->width,
                                   (uchar *)image->data[0], image->step[0]);
@@ -65,9 +67,7 @@ void occamImageToCvMat(OccamImage *&image, cv::Mat *&cvImage) {
     cvImage =
         new cv::Mat_<cv::Vec3b>(image->height, image->width,
                                 (cv::Vec3b *)image->data[0], image->step[0]);
-    cv::Mat *colorImage = new cv::Mat();
-    cv::cvtColor(*cvImage, *colorImage, cv::COLOR_BGR2RGB);
-    cvImage = colorImage;
+    cv::cvtColor(*cvImage, colorImage, cv::COLOR_BGR2RGB);
   } else if (image && image->format == OCCAM_SHORT1) {
     cvImage = new cv::Mat_<short>(image->height, image->width,
                                   (short *)image->data[0], image->step[0]);
@@ -75,12 +75,12 @@ void occamImageToCvMat(OccamImage *&image, cv::Mat *&cvImage) {
     printf("Image type not supported: %d\n", image->format);
     cvImage = NULL;
   }
+  return colorImage;
 }
 
 void saveImage(OccamImage *image, std::string fileName) {
-  cv::Mat *cvImage;
-  occamImageToCvMat(image, cvImage);
-  saveImage(cvImage, fileName);
+  cv::Mat cvImage = occamImageToCvMat(image);
+  saveImage(&cvImage, fileName);
 }
 
 void saveImage(cv::Mat *cvImage, std::string fileName) {
@@ -191,7 +191,8 @@ void initTransforms() {
   occam_to_beam_pose.orientation.z = -0.5;
   occam_to_beam_pose.orientation.w = 0.5;
   // occam_to_beam_pose.orientation.w = 1.0;
-  // occam_to_beam_pose.position.z = 0.5;  
+  occam_to_beam_pose.position.z = 1.658;  
+  occam_to_beam_pose.position.x = -0.140;  
   Eigen::Matrix4f occam_to_beam_transform = transform_from_pose(occam_to_beam_pose);
   // Eigen::Matrix4f occam_to_beam_transform = Eigen::Matrix4f::Identity();
 
@@ -434,13 +435,12 @@ void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI) {
   handleError(occamShutdown());
 }
 
-void getStitchedAndPointCloud(OccamDevice *device,
-                              pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud,
-                              cv::Mat *&cvImage) {
+cv::Mat getStitchedAndPointCloud(OccamDevice *device,
+                              pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
   void **data = captureStitchedAndPointCloud(device);
   OccamImage *image = (OccamImage *)data[0];
-  occamImageToCvMat(image, cvImage);
-  handleError(occamFreeImage(image));
+  cv::Mat i = occamImageToCvMat(image);
+  // handleError(occamFreeImage(image)); // caused seg fault
 
   // use latest odom data to transform the cloud with the movement of the robot
   Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
@@ -466,9 +466,11 @@ void getStitchedAndPointCloud(OccamDevice *device,
     handleError(occamFreePointCloud((OccamPointCloud *)data[i+1]));
   }
   printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
+  return i;
 }
 
 int main(int argc, char **argv) {
+
   // Init ROS node
   ros::init(argc, argv, "beam_occam");
   ros::NodeHandle n;
@@ -505,15 +507,16 @@ int main(int argc, char **argv) {
   //   cout << ( clock() - start ) / (double) CLOCKS_PER_SEC << " #######################################" << endl;
   // }
   
-  cv::Mat *cvImage;
+  cv::Mat cvImage;
   int counter = 0;
   while (ros::ok()) {
     (*cloud).clear();
 
-    getStitchedAndPointCloud(device, cloud, cvImage);
+    ros::Time capture_time = ros::Time::now();
+    cvImage = getStitchedAndPointCloud(device, cloud);
 
     // Convert cvImage to ROS Image msg and publish
-    sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", *cvImage).toImageMsg();
+    sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cvImage).toImageMsg();
     stitched_pub.publish(img_msg);
 
     // Convert PCL pointcloud to ROS PointCloud2 msg and publish
@@ -522,6 +525,7 @@ int main(int argc, char **argv) {
     pcl::toPCLPointCloud2(*cloud, tmp_cloud);
     pcl_conversions::fromPCL(tmp_cloud, pc2);
     pc2.header.frame_id = "odom";
+    pc2.header.stamp = capture_time;
     pc2_pub.publish(pc2);
 
     // Init PointcloudAndImage msg
