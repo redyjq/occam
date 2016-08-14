@@ -440,7 +440,7 @@ cv::Mat getStitchedAndPointCloud(OccamDevice *device,
   void **data = captureStitchedAndPointCloud(device);
   OccamImage *image = (OccamImage *)data[0];
   cv::Mat i = occamImageToCvMat(image);
-  // handleError(occamFreeImage(image)); // caused seg fault
+  handleError(occamFreeImage(image));
 
   // use latest odom data to transform the cloud with the movement of the robot
   Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
@@ -515,23 +515,27 @@ int main(int argc, char **argv) {
     ros::Time capture_time = ros::Time::now();
     cvImage = getStitchedAndPointCloud(device, cloud);
 
-    // Convert cvImage to ROS Image msg and publish
+    // Convert cvImage to ROS Image msg
     sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cvImage).toImageMsg();
-    stitched_pub.publish(img_msg);
+    img_msg->header.frame_id = "occam_optical_link";
+    img_msg->header.stamp = capture_time;
 
-    // Convert PCL pointcloud to ROS PointCloud2 msg and publish
+    // Convert PCL pointcloud to ROS PointCloud2 msg
     sensor_msgs::PointCloud2 pc2;
     pcl::PCLPointCloud2 tmp_cloud;
     pcl::toPCLPointCloud2(*cloud, tmp_cloud);
     pcl_conversions::fromPCL(tmp_cloud, pc2);
     pc2.header.frame_id = "odom";
     pc2.header.stamp = capture_time;
-    pc2_pub.publish(pc2);
 
     // Init PointcloudAndImage msg
     beam_joy::PointcloudAndImage pc_img_msg;
     pc_img_msg.pc = pc2;
     pc_img_msg.img = *img_msg;
+
+    // Publish all msgs
+    stitched_pub.publish(img_msg);
+    pc2_pub.publish(pc2);
     pc2_and_stitched_pub.publish(pc_img_msg);
 
     ros::spinOnce();
