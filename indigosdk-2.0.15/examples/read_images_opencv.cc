@@ -271,21 +271,21 @@ int main(int argc, const char** argv) {
 
     occamFreeImage(image);
 
-    int key = cv::waitKey(1);
+    char key = (char)cv::waitKey(1);
     if (key == 27 || key == 'Q' || key == 'q') // ESC/Q/q keys to quit
       break;
 
     else if (key == '1') { // next image output
       if (++current_req_index>=image_req.size())
-	current_req_index = 0;
+        current_req_index = 0;
       if (current_req_index<image_req.size())
-	std::cerr<<"Changing output to "<<dataName(image_req[current_req_index])<<std::endl;
+        std::cerr<<"Changing output to "<<dataName(image_req[current_req_index])<<std::endl;
     }
     else if (key == '2') { // previous image output
       if (--current_req_index<0)
-	current_req_index = std::max(0,int(image_req.size()-1));
+        current_req_index = std::max(0,int(image_req.size()-1));
       if (current_req_index<image_req.size())
-	std::cerr<<"Changing output to "<<dataName(image_req[current_req_index])<<std::endl;
+        std::cerr<<"Changing output to "<<dataName(image_req[current_req_index])<<std::endl;
     }
     else if (key == '3') { // cpu backend
       occamSetDeviceValuei(device, OCCAM_PREFERRED_BACKEND, OCCAM_CPU);

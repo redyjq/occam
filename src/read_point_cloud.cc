@@ -490,6 +490,10 @@ int main(int argc, char **argv) {
   OccamDevice *device = occamAPI.first;
   OccamDeviceList *deviceList = occamAPI.second;
 
+  // Enable auto exposure and gain **important**
+  occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
+  occamSetDeviceValuei(device,OCCAM_AUTO_GAIN, 1);
+
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
   // initialize global constants
   initSensorExtrisics(device);
