@@ -708,9 +708,9 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
                     std::bind(&OccamDevice_omnis5u3mt9v022::get_auto_gain,this),
                     std::bind(&OccamDevice_omnis5u3mt9v022::set_auto_gain,this,_1));
             setDefaultDeviceValuei(OCCAM_EXPOSURE,480);
-            setDefaultDeviceValueb(OCCAM_AUTO_EXPOSURE,false);
+            setDefaultDeviceValueb(OCCAM_AUTO_EXPOSURE,true);
             setDefaultDeviceValuei(OCCAM_GAIN,17);
-            setDefaultDeviceValueb(OCCAM_AUTO_GAIN,false);
+            setDefaultDeviceValueb(OCCAM_AUTO_GAIN,true);
 
             registerParami(OCCAM_TARGET_FPS,"target_fps",OCCAM_SETTINGS,0,0,
                     std::bind(&OccamDevice_omnis5u3mt9v022::get_target_fps,this),

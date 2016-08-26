@@ -173,8 +173,8 @@ Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
   return transform;
 }
 
-Eigen::Matrix4f occam_to_beam_and_scale_transform;
-Eigen::Matrix4f beam_odom_transform;
+Eigen::Matrix4f beam_occam_scale_transform;
+Eigen::Matrix4f odom_beam_transform;
 void initTransforms() {
   // scale the cloud from cm to m
   double scale = 0.01;
@@ -184,37 +184,37 @@ void initTransforms() {
   scale_transform (2,2) = scale;
 
   // use the transform from the beam robot base to the occam frame to orient the cloud
-  geometry_msgs::Pose occam_to_beam_pose;
+  geometry_msgs::Pose beam_occam_pose;
   // done so that z axis points up, x axis points forward, y axis points left
-  occam_to_beam_pose.orientation.x = -0.5;
-  occam_to_beam_pose.orientation.y = 0.5;
-  occam_to_beam_pose.orientation.z = -0.5;
-  occam_to_beam_pose.orientation.w = 0.5;
-  // occam_to_beam_pose.orientation.w = 1.0;
-  occam_to_beam_pose.position.z = 1.658;  
-  occam_to_beam_pose.position.x = -0.140;  
-  Eigen::Matrix4f occam_to_beam_transform = transform_from_pose(occam_to_beam_pose);
-  // Eigen::Matrix4f occam_to_beam_transform = Eigen::Matrix4f::Identity();
+  beam_occam_pose.orientation.x = -0.5;
+  beam_occam_pose.orientation.y = 0.5;
+  beam_occam_pose.orientation.z = -0.5;
+  beam_occam_pose.orientation.w = 0.5;
+  // beam_occam_pose.orientation.w = 1.0;
+  //beam_occam_pose.position.z = 1.658;  
+  //beam_occam_pose.position.x = -0.140;  
+  Eigen::Matrix4f beam_occam_transform = transform_from_pose(beam_occam_pose);
+  // Eigen::Matrix4f beam_occam_transform = Eigen::Matrix4f::Identity();
 
   // combine the transforms
-  occam_to_beam_and_scale_transform = occam_to_beam_transform * scale_transform;
+  beam_occam_scale_transform = beam_occam_transform * scale_transform;
 
   // if no odom recieved, assume identity transform
-  beam_odom_transform = Eigen::Matrix4f::Identity();
+  odom_beam_transform = Eigen::Matrix4f::Identity();
 
   printf("Initialized Transforms.\n");
 }
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   // Update the matrix used to transform the pointcloud to the odom frame
-  beam_odom_transform = transform_from_pose(msg->pose.pose);  
+  odom_beam_transform = transform_from_pose(msg->pose.pose);  
 }
 
 void occamCloudsToPCL(
   OccamPointCloud** pointClouds,
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr pclPointCloud) {
   // use latest odom data to transform the cloud with the movement of the robot
-  Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
+  Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
     // Print statistics
     // printf("Number of points in OCCAM_POINT_CLOUD%d: %d\n", i, pointClouds[i]->point_count);
@@ -443,7 +443,7 @@ cv::Mat getStitchedAndPointCloud(OccamDevice *device,
   handleError(occamFreeImage(image));
 
   // use latest odom data to transform the cloud with the movement of the robot
-  Eigen::Matrix4f odom_occam_transform = beam_odom_transform * occam_to_beam_and_scale_transform;
+  Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
     OccamPointCloud *occamCloud = (OccamPointCloud *)data[i+1];
     // Print statistics
@@ -488,28 +488,17 @@ int main(int argc, char **argv) {
 
   std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
-  OccamDeviceList *deviceList = occamAPI.second;
+  OccamDeviceList *deviceList = occamAPI.second;  
 
   // Enable auto exposure and gain **important**
-  occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
-  occamSetDeviceValuei(device,OCCAM_AUTO_GAIN, 1);
+  //occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
+  //occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
+  //std::cerr<<"auto-exposure disabled"<<std::endl;
 
   pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGBA>);
   // initialize global constants
   initSensorExtrisics(device);
   initTransforms();
-
-  // Capture Rate Test
-  // ros::Rate loop_rate(5);
-  // while (ros::ok()) {
-  //   clock_t start = clock();
-  //   printf("captureAllOccamClouds\n");
-  //   OccamPointCloud** occamClouds = captureAllOccamClouds(device);
-  //   occamFree(occamClouds);
-  //   ros::spinOnce();
-  //   loop_rate.sleep();
-  //   cout << ( clock() - start ) / (double) CLOCKS_PER_SEC << " #######################################" << endl;
-  // }
   
   cv::Mat cvImage;
   int counter = 0;
