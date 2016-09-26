@@ -270,6 +270,10 @@ int main(int argc, const char** argv) {
   else
     std::cerr << "OCCAM_STITCHED_IMAGE1 not found." << std::endl;
 
+  // init with auto exposure/gain
+  occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
+  occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
+
   for (i=0;;++i) {
     image = 0;
     if ((r = occamDeviceReadData(device,1,&image_req[current_req_index],0,
