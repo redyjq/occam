@@ -380,13 +380,28 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         auto max_disp = 64;
         auto wsize = 15;
         
-        Ptr<StereoBM> left_matcher = StereoBM::create(max_disp,wsize);
+        // StereoBM
+        // Ptr<StereoBM> left_matcher = StereoBM::create(max_disp,wsize);
+        // wls_filter = createDisparityWLSFilter(left_matcher);
+        // Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
+        // matching_time = (double)getTickCount();
+        // left_matcher-> compute(left_for_matcher, right_for_matcher,left_disp);
+        // right_matcher->compute(right_for_matcher,left_for_matcher, right_disp);
+        // matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
+
+        // StereoSGBM
+        Ptr<StereoSGBM> left_matcher  = StereoSGBM::create(0,max_disp,wsize);
+        left_matcher->setP1(24*wsize*wsize);
+        left_matcher->setP2(96*wsize*wsize);
+        left_matcher->setPreFilterCap(63);
+        left_matcher->setMode(StereoSGBM::MODE_SGBM_3WAY);
         wls_filter = createDisparityWLSFilter(left_matcher);
         Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
         matching_time = (double)getTickCount();
         left_matcher-> compute(left_for_matcher, right_for_matcher,left_disp);
         right_matcher->compute(right_for_matcher,left_for_matcher, right_disp);
         matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
+        
         printf("matching_time: %.3f\n", matching_time);
 
         //! [filtering]
