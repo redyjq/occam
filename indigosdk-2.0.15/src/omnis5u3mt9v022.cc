@@ -33,7 +33,19 @@
 #include <iostream>
 #include <assert.h>
 #include <string.h>
-#undef min
+#include <indigo.h>
+#include <math.h>
+#include "opencv2/calib3d.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/imgcodecs.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/core/utility.hpp"
+#include "opencv2/ximgproc/disparity_filter.hpp"
+
+using namespace cv;
+using namespace ximgproc;
+using namespace std;
+
 #undef max
 
 static DeferredImage subImage(const DeferredImage& img0,
@@ -250,6 +262,114 @@ static DeferredImage unrectifyImage(std::shared_ptr<void> rectify_handle,
         return std::shared_ptr<OccamImage>(img2,occamFreeImage);
     };  
     return DeferredImage(gen_fn,img0);
+}
+
+static OccamImage* cvMatToOccamImage(Mat src) {
+    OccamImage* dst;
+    memset(dst,0,sizeof(*dst));
+    dst->refcnt = 1;
+    dst->backend = OCCAM_CPU;
+    dst->cid = (char*)"";
+    dst->width = src.cols;
+    dst->height = src.rows;
+    dst->step[0] = src.step;
+    dst->data[0] = src.data;
+    if (src.type() == CV_8UC1) {
+        dst->format = OCCAM_GRAY8;
+    } else if (src.type() == CV_8UC3) {
+        dst->format = OCCAM_RGB24;
+    } else {
+        std::cerr<<"Unknown image type "<<src.type()<<std::endl;
+        abort();
+    }
+    return dst;
+}
+
+static Mat occamImageToCvMat(OccamImage *image) {
+    Mat img;
+    if (image && image->format == OCCAM_GRAY8)
+        img = Mat_<uchar>(image->height,image->width,(uchar*)image->data[0],image->step[0]);
+    else if (image && image->format == OCCAM_RGB24) {
+        img = Mat_<Vec3b>(image->height,image->width,(Vec3b*)image->data[0],image->step[0]);
+        Mat img1;
+        cvtColor(img, img1, COLOR_BGR2RGB);
+        img = img1;
+    } else if (image && image->format == OCCAM_SHORT1) {
+        img = Mat_<short>(image->height,image->width,(short*)image->data[0],image->step[0]);
+    } else {
+        //      printf("image format not supported by this demo\n");
+    }
+    auto s = img.size();
+    // printf("width: %d, height: %d\n", s.width, s.height);
+    return img;
+}
+
+static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
+        int index,
+        DeferredImage img0r,
+        DeferredImage img1r) {
+    auto gen_fn = [=](){
+        OccamImage* img0rp = img0r->get();
+        OccamImage* img1rp = img1r->get();
+
+        if(!(img0rp->width > 0)) {
+            abort();
+        }
+        
+        Mat left = occamImageToCvMat(img0rp);
+        Mat right = occamImageToCvMat(img1rp);
+        if (left.empty() || right.empty()) {
+            printf("Error: stereo img empty\n");
+        }
+
+        Mat left_for_matcher, right_for_matcher;
+        Mat left_disp,right_disp;
+        Mat filtered_disp;
+        Mat conf_map = Mat(left.rows,left.cols,CV_8U);
+        conf_map = Scalar(255);
+        Rect ROI;
+        Ptr<DisparityWLSFilter> wls_filter;
+        double matching_time, filtering_time;
+
+        left_for_matcher  = left.clone();
+        right_for_matcher = right.clone();
+
+        auto max_disp = 64;
+        auto wsize = 15;
+        
+        Ptr<StereoBM> left_matcher = StereoBM::create(max_disp,wsize);
+        wls_filter = createDisparityWLSFilter(left_matcher);
+        Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
+        matching_time = (double)getTickCount();
+        left_matcher-> compute(left_for_matcher, right_for_matcher,left_disp);
+        right_matcher->compute(right_for_matcher,left_for_matcher, right_disp);
+        matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
+        printf("matching_time: %.3f\n", matching_time);
+
+        //! [filtering]
+        auto lambda = 8000.0;
+        auto sigma = 1.5;
+        wls_filter->setLambda(lambda);
+        wls_filter->setSigmaColor(sigma);
+        filtering_time = (double)getTickCount();
+        wls_filter->filter(left_disp,left,filtered_disp,right_disp);
+        filtering_time = ((double)getTickCount() - filtering_time)/getTickFrequency();
+        //! [filtering]
+        conf_map = wls_filter->getConfidenceMap();
+        printf("filtering_time: %.3f\n", filtering_time);
+
+        imwrite("left_disp.jpg", left_disp);
+        imwrite("right_disp.jpg", right_disp);
+        imwrite("filtered_disp.jpg", filtered_disp);
+
+        IOccamStereo* stereo_iface = 0;
+        occamGetInterface(stereo_handle.get(),IOCCAMSTEREO,(void**)&stereo_iface);
+        OccamImage* disp = 0;
+        stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
+        // OccamImage* disp = cvMatToOccamImage(filtered_disp);
+        return std::shared_ptr<OccamImage>(disp,occamFreeImage);
+    };  
+    return DeferredImage(gen_fn,img0r,img1r);
 }
 
 static DeferredImage computeDisparityImage(std::shared_ptr<void> stereo_handle,
@@ -1088,6 +1208,7 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
             occamGetInterface(rectify_handle.get(),IOCCAMSTEREORECTIFY,(void**)&rectify_iface);
             rectify_iface->configure(rectify_handle.get(),10,sensor_width,sensor_height,Dp,Kp,Rp,Tp,1);
         }
+
         auto img0_mon0r = rectifyImage(rectify_handle,0,img0_mon0);
         auto img1_mon0r = rectifyImage(rectify_handle,1,img1_mon0);
         auto img0_mon1r = rectifyImage(rectify_handle,2,img0_mon1);
@@ -1110,11 +1231,30 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         out.set(OCCAM_RECTIFIED_IMAGE9,img1_mon4r);
 
         std::shared_ptr<void> stereo_handle = module(OCCAM_STEREO_MATCHER0);
-        auto disp0 = computeDisparityImage(stereo_handle,0,img0_mon0r,img1_mon0r);
-        auto disp1 = computeDisparityImage(stereo_handle,1,img0_mon1r,img1_mon1r);
-        auto disp2 = computeDisparityImage(stereo_handle,2,img0_mon2r,img1_mon2r);
-        auto disp3 = computeDisparityImage(stereo_handle,3,img0_mon3r,img1_mon3r);
-        auto disp4 = computeDisparityImage(stereo_handle,4,img0_mon4r,img1_mon4r);
+        // auto disp0 = computeDisparityImage(stereo_handle,0,img0_mon0r,img1_mon0r);
+        // auto disp1 = computeDisparityImage(stereo_handle,1,img0_mon1r,img1_mon1r);
+        // auto disp2 = computeDisparityImage(stereo_handle,2,img0_mon2r,img1_mon2r);
+        // auto disp3 = computeDisparityImage(stereo_handle,3,img0_mon3r,img1_mon3r);
+        // auto disp4 = computeDisparityImage(stereo_handle,4,img0_mon4r,img1_mon4r);
+
+        // **************************** color stereo matching ****************************
+        auto img0_pro0r = rectifyImage(rectify_handle,0,img0_pro0);
+        auto img1_pro0r = rectifyImage(rectify_handle,1,img1_pro0);
+        auto img0_pro1r = rectifyImage(rectify_handle,2,img0_pro1);
+        auto img1_pro1r = rectifyImage(rectify_handle,3,img1_pro1);
+        auto img0_pro2r = rectifyImage(rectify_handle,4,img0_pro2);
+        auto img1_pro2r = rectifyImage(rectify_handle,5,img1_pro2);
+        auto img0_pro3r = rectifyImage(rectify_handle,6,img0_pro3);
+        auto img1_pro3r = rectifyImage(rectify_handle,7,img1_pro3);
+        auto img0_pro4r = rectifyImage(rectify_handle,8,img0_pro4);
+        auto img1_pro4r = rectifyImage(rectify_handle,9,img1_pro4);
+
+        auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r);
+        auto disp1 = computeDisparityImage2(stereo_handle,1,img0_mon1r,img1_mon1r);
+        auto disp2 = computeDisparityImage2(stereo_handle,2,img0_mon2r,img1_mon2r);
+        auto disp3 = computeDisparityImage2(stereo_handle,3,img0_mon3r,img1_mon3r);
+        auto disp4 = computeDisparityImage2(stereo_handle,4,img0_mon4r,img1_mon4r);
+        // *******************************************************************************
 
         auto disp0r = unrectifyImage(rectify_handle,0,disp0);
         auto disp1r = unrectifyImage(rectify_handle,2,disp1);
@@ -1129,11 +1269,11 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         out.set(OCCAM_DISPARITY_IMAGE4,disp4r);
         out.set(OCCAM_TILED_DISPARITY_IMAGE,htile({disp0r,disp1r,disp2r,disp3r,disp4r}));
 
-        auto img0_pro0r = rectifyImage(rectify_handle,0,img0_pro0);
-        auto img0_pro1r = rectifyImage(rectify_handle,2,img0_pro1);
-        auto img0_pro2r = rectifyImage(rectify_handle,4,img0_pro2);
-        auto img0_pro3r = rectifyImage(rectify_handle,6,img0_pro3);
-        auto img0_pro4r = rectifyImage(rectify_handle,8,img0_pro4);
+        // auto img0_pro0r = rectifyImage(rectify_handle,0,img0_pro0);
+        // auto img0_pro1r = rectifyImage(rectify_handle,2,img0_pro1);
+        // auto img0_pro2r = rectifyImage(rectify_handle,4,img0_pro2);
+        // auto img0_pro3r = rectifyImage(rectify_handle,6,img0_pro3);
+        // auto img0_pro4r = rectifyImage(rectify_handle,8,img0_pro4);
 
         out.set(OCCAM_POINT_CLOUD0,computePointCloud(rectify_handle,0,img0_pro0r,disp0));
         out.set(OCCAM_POINT_CLOUD1,computePointCloud(rectify_handle,2,img0_pro1r,disp1));

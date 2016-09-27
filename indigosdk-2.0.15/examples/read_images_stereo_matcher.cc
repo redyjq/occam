@@ -156,16 +156,6 @@ int main(int argc, const char** argv) {
   OccamDevice* device;
   OccamImage* image;
 
-  int _OCCAM_BM_PREFILTER_SIZE = 9;
-  int _OCCAM_BM_PREFILTER_CAP = 31;
-  int _OCCAM_BM_SAD_WINDOW_SIZE = 15;
-  int _OCCAM_BM_MIN_DISPARITY = 0;
-  int _OCCAM_BM_NUM_DISPARITIES = 64;
-  int _OCCAM_BM_TEXTURE_THRESHOLD = 10;
-  int _OCCAM_BM_UNIQUENESS_RATIO = 60;
-  int _OCCAM_BM_SPECKLE_RANGE = 120;
-  int _OCCAM_BM_SPECKLE_WINDOW_SIZE = 400;
-
   if ((r = occamInitialize()) != OCCAM_API_SUCCESS)
     reportError(r);
 
@@ -273,6 +263,17 @@ int main(int argc, const char** argv) {
   // init with auto exposure/gain
   occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
   occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
+
+  // init default values
+  int _OCCAM_BM_PREFILTER_SIZE = 9;
+  int _OCCAM_BM_PREFILTER_CAP = 31;
+  int _OCCAM_BM_SAD_WINDOW_SIZE = 15;
+  int _OCCAM_BM_MIN_DISPARITY = 0;
+  int _OCCAM_BM_NUM_DISPARITIES = 64;
+  int _OCCAM_BM_TEXTURE_THRESHOLD = 10;
+  int _OCCAM_BM_UNIQUENESS_RATIO = 60;
+  int _OCCAM_BM_SPECKLE_RANGE = 120;
+  int _OCCAM_BM_SPECKLE_WINDOW_SIZE = 400;
 
   for (i=0;;++i) {
     image = 0;
