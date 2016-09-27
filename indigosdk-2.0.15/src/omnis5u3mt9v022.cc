@@ -264,27 +264,6 @@ static DeferredImage unrectifyImage(std::shared_ptr<void> rectify_handle,
     return DeferredImage(gen_fn,img0);
 }
 
-static OccamImage* cvMatToOccamImage(Mat src) {
-    OccamImage* dst;
-    memset(dst,0,sizeof(*dst));
-    dst->refcnt = 1;
-    dst->backend = OCCAM_CPU;
-    dst->cid = (char*)"";
-    dst->width = src.cols;
-    dst->height = src.rows;
-    dst->step[0] = src.step;
-    dst->data[0] = src.data;
-    if (src.type() == CV_8UC1) {
-        dst->format = OCCAM_GRAY8;
-    } else if (src.type() == CV_8UC3) {
-        dst->format = OCCAM_RGB24;
-    } else {
-        std::cerr<<"Unknown image type "<<src.type()<<std::endl;
-        abort();
-    }
-    return dst;
-}
-
 static Mat occamImageToCvMat(OccamImage *image) {
     Mat img;
     if (image && image->format == OCCAM_GRAY8)
@@ -302,6 +281,69 @@ static Mat occamImageToCvMat(OccamImage *image) {
     auto s = img.size();
     // printf("width: %d, height: %d\n", s.width, s.height);
     return img;
+}
+
+static void cvMatToOccamImage(Mat src, OccamImage* dst) {
+    memset(dst,0,sizeof(OccamImage));
+    dst->refcnt = 1;
+    dst->backend = OCCAM_CPU;
+    dst->cid = (char*)"";
+    dst->width = src.cols;
+    dst->height = src.rows;
+    dst->step[0] = src.step;
+    dst->data[0] = src.data;
+    if (src.type() == CV_8UC1) {
+        dst->format = OCCAM_GRAY8;
+    } else if (src.type() == CV_16SC1) {
+        dst->format = OCCAM_SHORT1;
+    } else if (src.type() == CV_8UC3) {
+        dst->format = OCCAM_RGB24;
+    } else {
+        std::cerr<<"Unknown image type "<<src.type()<<std::endl;
+        abort();
+    }
+}
+
+static std::string getImageType(int number)
+{
+    // find type
+    int imgTypeInt = number%8;
+    std::string imgTypeString;
+
+    switch (imgTypeInt)
+    {
+        case 0:
+            imgTypeString = "8U";
+            break;
+        case 1:
+            imgTypeString = "8S";
+            break;
+        case 2:
+            imgTypeString = "16U";
+            break;
+        case 3:
+            imgTypeString = "16S";
+            break;
+        case 4:
+            imgTypeString = "32S";
+            break;
+        case 5:
+            imgTypeString = "32F";
+            break;
+        case 6:
+            imgTypeString = "64F";
+            break;
+        default:
+            break;
+    }
+
+    // find channel
+    int channel = (number/8) + 1;
+
+    std::stringstream type;
+    type<<"CV_"<<imgTypeString<<"C"<<channel;
+
+    return type.str();
 }
 
 static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
@@ -327,7 +369,6 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         Mat filtered_disp;
         Mat conf_map = Mat(left.rows,left.cols,CV_8U);
         conf_map = Scalar(255);
-        Rect ROI;
         Ptr<DisparityWLSFilter> wls_filter;
         double matching_time, filtering_time;
 
@@ -361,12 +402,31 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         imwrite("left_disp.jpg", left_disp);
         imwrite("right_disp.jpg", right_disp);
         imwrite("filtered_disp.jpg", filtered_disp);
-
+        
+        OccamImage* disp = 0;
         IOccamStereo* stereo_iface = 0;
         occamGetInterface(stereo_handle.get(),IOCCAMSTEREO,(void**)&stereo_iface);
-        OccamImage* disp = 0;
         stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
-        // OccamImage* disp = cvMatToOccamImage(filtered_disp);
+
+        OccamImage* disp_cv = new OccamImage;
+        filtered_disp.convertTo(filtered_disp, CV_16SC1);
+        cvMatToOccamImage(filtered_disp, disp_cv);
+        disp_cv->cid = disp->cid;
+        disp_cv->time_ns = disp->time_ns;
+        disp_cv->index = disp->index;
+        disp_cv->refcnt = disp->refcnt;
+        disp_cv->backend = disp->backend;
+        disp_cv->format = disp->format;
+        // Mat test_cv = occamImageToCvMat(disp_cv);
+        // imwrite("test_cv.jpg", test_cv);
+
+        // Mat test = occamImageToCvMat(disp);
+        // printf("disp->format: %d\n", disp->format);
+        // printf("test.type(): %s\n", (getImageType(test.type())).c_str() );
+        // imwrite("test.jpg", test);
+
+        // occamFreeImage(disp_cv);
+
         return std::shared_ptr<OccamImage>(disp,occamFreeImage);
     };  
     return DeferredImage(gen_fn,img0r,img1r);
