@@ -283,7 +283,8 @@ static Mat occamImageToCvMat(OccamImage *image) {
     return img;
 }
 
-static void cvMatToOccamImage(Mat src, OccamImage* dst) {
+static OccamImage* cvMatToOccamImage(Mat src) {
+    OccamImage* dst = new OccamImage;
     memset(dst,0,sizeof(OccamImage));
     dst->refcnt = 1;
     dst->backend = OCCAM_CPU;
@@ -302,6 +303,7 @@ static void cvMatToOccamImage(Mat src, OccamImage* dst) {
         std::cerr<<"Unknown image type "<<src.type()<<std::endl;
         abort();
     }
+    return dst;
 }
 
 static std::string getImageType(int number)
@@ -399,35 +401,34 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         conf_map = wls_filter->getConfidenceMap();
         printf("filtering_time: %.3f\n", filtering_time);
 
-        imwrite("left_disp.jpg", left_disp);
-        imwrite("right_disp.jpg", right_disp);
-        imwrite("filtered_disp.jpg", filtered_disp);
-        
-        OccamImage* disp = 0;
-        IOccamStereo* stereo_iface = 0;
-        occamGetInterface(stereo_handle.get(),IOCCAMSTEREO,(void**)&stereo_iface);
-        stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
+        // OccamImage* disp = 0;
+        // IOccamStereo* stereo_iface = 0;
+        // occamGetInterface(stereo_handle.get(),IOCCAMSTEREO,(void**)&stereo_iface);
+        // stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
 
-        OccamImage* disp_cv = new OccamImage;
         filtered_disp.convertTo(filtered_disp, CV_16SC1);
-        cvMatToOccamImage(filtered_disp, disp_cv);
-        disp_cv->cid = disp->cid;
-        disp_cv->time_ns = disp->time_ns;
-        disp_cv->index = disp->index;
-        disp_cv->refcnt = disp->refcnt;
-        disp_cv->backend = disp->backend;
-        disp_cv->format = disp->format;
-        // Mat test_cv = occamImageToCvMat(disp_cv);
-        // imwrite("test_cv.jpg", test_cv);
+        OccamImage* disp_cv = 0;
+        disp_cv = cvMatToOccamImage(filtered_disp);
+        // disp_cv->cid = disp->cid;
+        // disp_cv->time_ns = disp->time_ns;
+        // disp_cv->index = disp->index;
+        // disp_cv->refcnt = disp->refcnt;
+        // disp_cv->backend = disp->backend;
+        // disp_cv->format = disp->format;
+        // disp = disp_cv;
 
+        // Mat test_cv = occamImageToCvMat(disp_cv);
         // Mat test = occamImageToCvMat(disp);
-        // printf("disp->format: %d\n", disp->format);
-        // printf("test.type(): %s\n", (getImageType(test.type())).c_str() );
+        // imwrite("left_disp.jpg", left_disp);
+        // imwrite("right_disp.jpg", right_disp);
+        // imwrite("filtered_disp.jpg", filtered_disp);
+        // imwrite("test_cv.jpg", test_cv);
         // imwrite("test.jpg", test);
 
-        // occamFreeImage(disp_cv);
+        // occamFreeImage(disp);
 
-        return std::shared_ptr<OccamImage>(disp,occamFreeImage);
+
+        return std::shared_ptr<OccamImage>(disp_cv);
     };  
     return DeferredImage(gen_fn,img0r,img1r);
 }
