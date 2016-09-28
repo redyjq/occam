@@ -358,6 +358,10 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         OccamImage* img0rp = img0r->get();
         OccamImage* img1rp = img1r->get();
 
+        Mat left_for_matcher, right_for_matcher;
+        // left_for_matcher = imread("matcher_img/left_for_matcher2.jpg", IMREAD_UNCHANGED);
+        // right_for_matcher = imread("matcher_img/right_for_matcher2.jpg", IMREAD_UNCHANGED);
+
         double matching_time, filtering_time;
 
         IOccamStereo* stereo_iface = 0;
@@ -369,8 +373,8 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         printf("matching_time: %.3f\n", matching_time);
 
         Mat disp_cv = occamImageToCvMat(disp);
-        Mat left_for_matcher = occamImageToCvMat(img0rp);
-        // Mat right_for_matcher = occamImageToCvMat(img1rp);
+        left_for_matcher = occamImageToCvMat(img0rp);
+        // right_for_matcher = occamImageToCvMat(img1rp);
         if (left_for_matcher.empty() || disp_cv.empty()) {
             printf("Error: img empty\n");
         }
@@ -386,8 +390,8 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         auto wsize = 15;
         
         Ptr<StereoBM> matcher  = StereoBM::create(max_disp,wsize);
-        matcher->setTextureThreshold(0);
-        matcher->setUniquenessRatio(0);
+        matcher->setTextureThreshold(10);
+        matcher->setUniquenessRatio(60);
         ROI = computeROI(left_for_matcher.size(),matcher);
         wls_filter = createDisparityWLSFilterGeneric(false);
         wls_filter->setDepthDiscontinuityRadius((int)ceil(0.33*wsize));
@@ -443,28 +447,29 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         Mat left_for_matcher, right_for_matcher;
         Mat left_disp,right_disp;
         Mat filtered_disp;
-        Mat conf_map = Mat(left.rows,left.cols,CV_8U);
+        Mat conf_map = Mat(left_for_matcher.rows,left_for_matcher.cols,CV_8U);
         conf_map = Scalar(255);
         Ptr<DisparityWLSFilter> wls_filter;
         double matching_time, filtering_time;
 
-        // left_for_matcher  = left.clone();
-        // right_for_matcher = right.clone();
-        left_for_matcher = imread("matcher_img/left_for_matcher2.jpg", IMREAD_UNCHANGED);
-        right_for_matcher = imread("matcher_img/right_for_matcher2.jpg", IMREAD_UNCHANGED);
+        left_for_matcher  = left.clone();
+        right_for_matcher = right.clone();
+        // left_for_matcher = imread("matcher_img/left_for_matcher2.jpg", IMREAD_UNCHANGED);
+        // right_for_matcher = imread("matcher_img/right_for_matcher2.jpg", IMREAD_UNCHANGED);
 
         auto max_disp = 64;
         auto wsize = 15;
+        printf("wsize: %d\n", wsize);
         
         // StereoBM
         Ptr<StereoBM> left_matcher = StereoBM::create(max_disp,wsize);
-        left_matcher->setTextureThreshold(10);
-        left_matcher->setUniquenessRatio(60);
+        // left_matcher->setTextureThreshold(0);
+        // left_matcher->setUniquenessRatio(0);
         wls_filter = createDisparityWLSFilter(left_matcher);
         Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
         matching_time = (double)getTickCount();
-        left_matcher-> compute(left_for_matcher, right_for_matcher,left_disp);
-        right_matcher->compute(right_for_matcher,left_for_matcher, right_disp);
+        left_matcher->compute(left_for_matcher, right_for_matcher,left_disp);
+        right_matcher->compute(right_for_matcher, left_for_matcher, right_disp);
         matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
 
         // StereoSGBM
@@ -492,7 +497,7 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         wls_filter->setLambda(lambda);
         wls_filter->setSigmaColor(sigma);
         filtering_time = (double)getTickCount();
-        wls_filter->filter(left_disp,left,filtered_disp,right_disp);
+        wls_filter->filter(left_disp,left_for_matcher,filtered_disp,right_disp);
         filtering_time = ((double)getTickCount() - filtering_time)/getTickFrequency();
         //! [filtering]
         conf_map = wls_filter->getConfidenceMap();
@@ -508,9 +513,9 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
 
         // Mat test_cv = occamImageToCvMat(disp_cv);
         // Mat test = occamImageToCvMat(disp);
-        // imwrite("left_disp.jpg", left_disp);
-        // imwrite("right_disp.jpg", right_disp);
-        // imwrite("filtered_disp.jpg", filtered_disp);
+        imwrite("left_disp.jpg", left_disp);
+        imwrite("right_disp.jpg", right_disp);
+        imwrite("filtered_disp.jpg", filtered_disp);
         // imwrite("test_cv.jpg", test_cv);
         // imwrite("test.jpg", test);
         imwrite("left_for_matcher.jpg", left_for_matcher);
@@ -1386,12 +1391,20 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         // auto disp3 = computeDisparityImage(stereo_handle,3,img0_mon3r,img1_mon3r);
         // auto disp4 = computeDisparityImage(stereo_handle,4,img0_mon4r,img1_mon4r);
 
+        // **************************** Disparity Filtering ****************************
+        // auto disp0 = computeDisparityImage3(stereo_handle,0,img0_mon0r,img1_mon0r);
+        // auto disp1 = computeDisparityImage3(stereo_handle,1,img0_mon1r,img1_mon1r);
+        // auto disp2 = computeDisparityImage3(stereo_handle,2,img0_mon2r,img1_mon2r);
+        // auto disp3 = computeDisparityImage3(stereo_handle,3,img0_mon3r,img1_mon3r);
+        // auto disp4 = computeDisparityImage3(stereo_handle,4,img0_mon4r,img1_mon4r);
+        // *******************************************************************************
+
         // **************************** StereoBM matching ****************************
-        auto disp0 = computeDisparityImage3(stereo_handle,0,img0_mon0r,img1_mon0r);
-        auto disp1 = computeDisparityImage3(stereo_handle,1,img0_mon1r,img1_mon1r);
-        auto disp2 = computeDisparityImage3(stereo_handle,2,img0_mon2r,img1_mon2r);
-        auto disp3 = computeDisparityImage3(stereo_handle,3,img0_mon3r,img1_mon3r);
-        auto disp4 = computeDisparityImage3(stereo_handle,4,img0_mon4r,img1_mon4r);
+        auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r);
+        auto disp1 = computeDisparityImage2(stereo_handle,1,img0_mon1r,img1_mon1r);
+        auto disp2 = computeDisparityImage2(stereo_handle,2,img0_mon2r,img1_mon2r);
+        auto disp3 = computeDisparityImage2(stereo_handle,3,img0_mon3r,img1_mon3r);
+        auto disp4 = computeDisparityImage2(stereo_handle,4,img0_mon4r,img1_mon4r);
         // *******************************************************************************
 
         auto disp0r = unrectifyImage(rectify_handle,0,disp0);

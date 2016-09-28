@@ -251,14 +251,16 @@ int main(int argc, const char** argv) {
   int fps = 0;
   time_t last_reset = 0;
 
-  // init to OCCAM_STITCHED_IMAGE1
-  int pos = std::find(image_req.begin(), image_req.end(), OCCAM_STITCHED_IMAGE1) - image_req.begin();
+  // init to start img
+  auto start = OCCAM_STITCHED_IMAGE1;
+  // auto start = OCCAM_STITCHED_DISPARITY_IMAGE;
+  int pos = std::find(image_req.begin(), image_req.end(), start) - image_req.begin();
   if( pos < image_req.size() ) {
     current_req_index = pos;
     std::cerr<<"Changing output to "<<dataName(image_req[current_req_index])<<std::endl;
   }
   else
-    std::cerr << "OCCAM_STITCHED_IMAGE1 not found." << std::endl;
+    std::cerr << "start not found." << std::endl;
 
   // init with auto exposure/gain
   occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
