@@ -32,6 +32,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#define stringify( name ) # name
+
 enum BMPrefilterTypes {
   OCCAM_PREFILTER_NONE = 0,
   OCCAM_PREFILTER_XSOBEL = 1,
@@ -148,6 +150,94 @@ bool getParamRange(OccamDevice* device, OccamParam param_type, int& min_value, i
   return false;
 }
 
+void changeParam(OccamDevice* device, OccamParam* params, std::string paramName, int change) {
+  int value; occamGetDeviceValuei(device, params[0], &value);
+  for( unsigned int i= 0; i< sizeof(params)/sizeof(params[0]); i++ )
+    if(params[i] != (OccamParam)0) {
+      occamSetDeviceValuei(device, params[i], value+change);
+    }
+  printf("################### %s changed to %d ###################\n", paramName.c_str(), value+change);
+}
+
+void initParams(OccamDevice* device) {
+  OccamParam changing_param[2];
+  std::string changing_param_name = "";
+
+  changing_param[0] = OCCAM_BM_PREFILTER_SIZE;
+  changing_param[1] = BM_PREFILTER_SIZE;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_PREFILTER_CAP;
+  changing_param[1] = BM_PREFILTER_CAP;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_SAD_WINDOW_SIZE;
+  changing_param[1] = BM_SAD_WINDOW_SIZE;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_MIN_DISPARITY;
+  changing_param[1] = BM_MIN_DISPARITY;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_NUM_DISPARITIES;
+  changing_param[1] = BM_NUM_DISPARITIES;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_TEXTURE_THRESHOLD;
+  changing_param[1] = BM_TEXTURE_THRESHOLD;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_UNIQUENESS_RATIO;
+  changing_param[1] = BM_UNIQUENESS_RATIO;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_SPECKLE_RANGE;
+  changing_param[1] = BM_SPECKLE_RANGE;
+  changeParam(device, changing_param, changing_param_name, 0);
+
+  changing_param[0] = OCCAM_BM_SPECKLE_WINDOW_SIZE;
+  changing_param[1] = BM_SPECKLE_WINDOW_SIZE;
+  changeParam(device, changing_param, changing_param_name, 0);
+}
+
+void printHelp() {
+  printf("COMMANDS:\n");
+  printf("  ESC/Q/q: quit this application\n");
+  printf("  1: next image output\n");
+  printf("  2: previous image output\n");
+  printf("  3: cpu backend\n");
+  printf("  4: opengl backend\n");
+  printf("  5: disable auto-exposure\n");
+  printf("  6: enable auto-exposure\n");
+  printf("  7: disable auto-gain\n");
+  printf("  8: enable auto-gain\n");
+  printf("  [: decrease exposure\n");
+  printf("  ]: increase exposure\n");
+  printf("  ;: decrease gain\n");
+  printf("  ': increase gain\n");
+
+  printf("  q: set OCCAM_BM_PREFILTER_TYPE to OCCAM_PREFILTER_XSOBEL\n");
+  printf("  a: set OCCAM_BM_PREFILTER_TYPE to OCCAM_PREFILTER_NONE\n");
+  printf("  z: set OCCAM_BM_PREFILTER_TYPE to OCCAM_PREFILTER_NORMALIZED_RESPONSE\n");
+
+  printf("  w: change OCCAM_BM_PREFILTER_SIZE\n");
+  printf("  s: change OCCAM_BM_PREFILTER_CAP\n");
+  printf("  x: change OCCAM_BM_SAD_WINDOW_SIZE\n");
+  printf("  e: change OCCAM_BM_MIN_DISPARITY\n");
+  printf("  d: change OCCAM_BM_NUM_DISPARITIES\n");
+  printf("  c: change OCCAM_BM_TEXTURE_THRESHOLD\n");
+  printf("  r: change OCCAM_BM_UNIQUENESS_RATIO\n");
+  printf("  f: change OCCAM_BM_SPECKLE_RANGE\n");
+  printf("  v: change OCCAM_BM_SPECKLE_WINDOW_SIZE\n");
+  printf("  t: change OCCAM_FILTER_LAMBDA\n");
+  printf("  g: change OCCAM_FILTER_SIGMA\n");
+
+  printf("  up/right: increase selected param\n");
+  printf("  down/left: decrease selected param\n");
+
+  printf("  h: show help\n");
+}
+
 int main(int argc, const char** argv) {
   int r;
   int i;
@@ -194,42 +284,7 @@ int main(int argc, const char** argv) {
   int gain = (max_gain + min_gain) / 2;
   bool downsample = true;
 
-  printf("COMMANDS:\n");
-  printf("  ESC/Q/q: quit this application\n");
-  printf("  1: next image output\n");
-  printf("  2: previous image output\n");
-  printf("  3: cpu backend\n");
-  printf("  4: opengl backend\n");
-  printf("  r: disable auto-exposure\n");
-  printf("  t: enable auto-exposure\n");
-  printf("  f: disable auto-gain\n");
-  printf("  g: enable auto-gain\n");
-  printf("  [: decrease exposure\n");
-  printf("  ]: increase exposure\n");
-  printf("  ;: decrease gain\n");
-  printf("  ': increase gain\n");
-
-  printf("  q: set OCCAM_BM_PREFILTER_TYPE to OCCAM_PREFILTER_XSOBEL\n");
-  printf("  a: set OCCAM_BM_PREFILTER_TYPE to OCCAM_PREFILTER_NONE\n");
-  printf("  z: set OCCAM_BM_PREFILTER_TYPE to OCCAM_PREFILTER_NORMALIZED_RESPONSE\n");
-  printf("  w: OCCAM_BM_PREFILTER_SIZE increase\n");
-  printf("  e: OCCAM_BM_PREFILTER_SIZE decrease\n");
-  printf("  s: OCCAM_BM_PREFILTER_CAP increase\n");
-  printf("  d: OCCAM_BM_PREFILTER_CAP decrease\n");
-  printf("  x: OCCAM_BM_SAD_WINDOW_SIZE increase\n");
-  printf("  c: OCCAM_BM_SAD_WINDOW_SIZE decrease\n");
-  printf("  v: OCCAM_BM_MIN_DISPARITY increase\n");
-  printf("  b: OCCAM_BM_MIN_DISPARITY decrease\n");
-  printf("  y: OCCAM_BM_NUM_DISPARITIES increase\n");
-  printf("  u: OCCAM_BM_NUM_DISPARITIES decrease\n");
-  printf("  h: OCCAM_BM_TEXTURE_THRESHOLD increase\n");
-  printf("  j: OCCAM_BM_TEXTURE_THRESHOLD decrease\n");
-  printf("  n: OCCAM_BM_UNIQUENESS_RATIO increase\n");
-  printf("  m: OCCAM_BM_UNIQUENESS_RATIO decrease\n");
-  printf("  i: OCCAM_BM_SPECKLE_RANGE increase\n");
-  printf("  o: OCCAM_BM_SPECKLE_RANGE decrease\n");
-  printf("  k: OCCAM_BM_SPECKLE_WINDOW_SIZE increase\n");
-  printf("  l: OCCAM_BM_SPECKLE_WINDOW_SIZE decrease\n");
+  printHelp();
 
   int req_count = 0;
   OccamDataName* req;
@@ -265,19 +320,19 @@ int main(int argc, const char** argv) {
   // init with auto exposure/gain
   occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
   occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
+  initParams(device);
 
-  // init default values
-  int _OCCAM_BM_PREFILTER_SIZE = 9;
-  int _OCCAM_BM_PREFILTER_CAP = 31;
-  int _OCCAM_BM_SAD_WINDOW_SIZE = 15;
-  int _OCCAM_BM_MIN_DISPARITY = 0;
-  int _OCCAM_BM_NUM_DISPARITIES = 64;
-  int _OCCAM_BM_TEXTURE_THRESHOLD = 10;
-  int _OCCAM_BM_UNIQUENESS_RATIO = 60;
-  int _OCCAM_BM_SPECKLE_RANGE = 120;
-  int _OCCAM_BM_SPECKLE_WINDOW_SIZE = 400;
+  // init stereo params
+  occamSetDeviceValuei(device,OCCAM_MAX_DEFERRED_REAPING_FRAMES,1);
 
-  for (i=0;;++i) {
+
+  OccamParam changing_param[2];
+  changing_param[0] = OCCAM_FILTER_LAMBDA;
+  changing_param[1] = (OccamParam)0;
+  std::string changing_param_name = stringify(OCCAM_FILTER_LAMBDA);
+
+  // for (i=0;;++i) {
+  for (i=0; i<10; ++i) {
     image = 0;
     if ((r = occamDeviceReadData(device,1,&image_req[current_req_index],0,
          (void**)&image, 1)) != OCCAM_API_SUCCESS) {
@@ -354,20 +409,20 @@ int main(int argc, const char** argv) {
     }
     
 
-    else if (key == 'r') { // disable auto-exposure
+    else if (key == '6') { // disable auto-exposure
       occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 0);
       std::cerr<<"auto-exposure disabled"<<std::endl;
     }
-    else if (key == 't') { // enable auto-exposure
+    else if (key == '7') { // enable auto-exposure
       occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
       std::cerr<<"auto-exposure enabled"<<std::endl;
     }
 
-    else if (key == 'f') { // disable auto-gain
+    else if (key == '8') { // disable auto-gain
       occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 0);
       std::cerr<<"auto-gain disabled"<<std::endl;
     }
-    else if (key == 'g') { // enable auto-gain
+    else if (key == '9') { // enable auto-gain
       occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
       std::cerr<<"auto-gain enabled"<<std::endl;
     }
@@ -408,102 +463,79 @@ int main(int argc, const char** argv) {
     }
     
     else if (key == 'w') {
-      _OCCAM_BM_PREFILTER_SIZE++;
-      occamSetDeviceValuei(device, OCCAM_BM_PREFILTER_SIZE,_OCCAM_BM_PREFILTER_SIZE);
-      std::cerr<<"OCCAM_BM_PREFILTER_SIZE (default: 9) increased to "<<_OCCAM_BM_PREFILTER_SIZE<<std::endl;
+      changing_param[0] = OCCAM_BM_PREFILTER_SIZE;
+      changing_param[1] = BM_PREFILTER_SIZE;
+      changing_param_name = stringify(OCCAM_BM_PREFILTER_SIZE);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
+    }
+    else if (key == 's') {
+      changing_param[0] = OCCAM_BM_PREFILTER_CAP;
+      changing_param[1] = BM_PREFILTER_CAP;
+      changing_param_name = stringify(OCCAM_BM_PREFILTER_CAP);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
+    }
+    else if (key == 'x') {
+      changing_param[0] = OCCAM_BM_SAD_WINDOW_SIZE;
+      changing_param[1] = BM_SAD_WINDOW_SIZE;
+      changing_param_name = stringify(OCCAM_BM_SAD_WINDOW_SIZE);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
     else if (key == 'e') {
-      _OCCAM_BM_PREFILTER_SIZE--;
-      occamSetDeviceValuei(device, OCCAM_BM_PREFILTER_SIZE,_OCCAM_BM_PREFILTER_SIZE);
-      std::cerr<<"OCCAM_BM_PREFILTER_SIZE (default: 9) decreased to "<<_OCCAM_BM_PREFILTER_SIZE<<std::endl;
-    }
-    
-    else if (key == 's') {
-      _OCCAM_BM_PREFILTER_CAP++;
-      occamSetDeviceValuei(device, OCCAM_BM_PREFILTER_CAP,_OCCAM_BM_PREFILTER_CAP);
-      std::cerr<<"OCCAM_BM_PREFILTER_CAP (default: 31) increased to "<<_OCCAM_BM_PREFILTER_CAP<<std::endl;
+      changing_param[0] = OCCAM_BM_MIN_DISPARITY;
+      changing_param[1] = BM_MIN_DISPARITY;
+      changing_param_name = stringify(OCCAM_BM_MIN_DISPARITY);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
     else if (key == 'd') {
-      _OCCAM_BM_PREFILTER_CAP--;
-      occamSetDeviceValuei(device, OCCAM_BM_PREFILTER_CAP,_OCCAM_BM_PREFILTER_CAP);
-      std::cerr<<"OCCAM_BM_PREFILTER_CAP (default: 31) decreased to "<<_OCCAM_BM_PREFILTER_CAP<<std::endl;
-    }
-    
-    else if (key == 'x') {
-      _OCCAM_BM_SAD_WINDOW_SIZE++;
-      occamSetDeviceValuei(device, OCCAM_BM_SAD_WINDOW_SIZE,_OCCAM_BM_SAD_WINDOW_SIZE);
-      std::cerr<<"OCCAM_BM_SAD_WINDOW_SIZE (default: 15) increased to "<<_OCCAM_BM_SAD_WINDOW_SIZE<<std::endl;
+      changing_param[0] = OCCAM_BM_NUM_DISPARITIES;
+      changing_param[1] = BM_NUM_DISPARITIES;
+      changing_param_name = stringify(OCCAM_BM_NUM_DISPARITIES);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
     else if (key == 'c') {
-      _OCCAM_BM_SAD_WINDOW_SIZE--;
-      occamSetDeviceValuei(device, OCCAM_BM_SAD_WINDOW_SIZE,_OCCAM_BM_SAD_WINDOW_SIZE);
-      std::cerr<<"OCCAM_BM_SAD_WINDOW_SIZE (default: 15) decreased to "<<_OCCAM_BM_SAD_WINDOW_SIZE<<std::endl;
+      changing_param[0] = OCCAM_BM_TEXTURE_THRESHOLD;
+      changing_param[1] = BM_TEXTURE_THRESHOLD;
+      changing_param_name = stringify(OCCAM_BM_TEXTURE_THRESHOLD);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
-    
+    else if (key == 'r') {
+      changing_param[0] = OCCAM_BM_UNIQUENESS_RATIO;
+      changing_param[1] = BM_UNIQUENESS_RATIO;
+      changing_param_name = stringify(OCCAM_BM_UNIQUENESS_RATIO);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
+    }
+    else if (key == 'f') {
+      changing_param[0] = OCCAM_BM_SPECKLE_RANGE;
+      changing_param[1] = BM_SPECKLE_RANGE;
+      changing_param_name = stringify(OCCAM_BM_SPECKLE_RANGE);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
+    }
     else if (key == 'v') {
-      _OCCAM_BM_MIN_DISPARITY++;
-      occamSetDeviceValuei(device, OCCAM_BM_MIN_DISPARITY,_OCCAM_BM_MIN_DISPARITY);
-      std::cerr<<"OCCAM_BM_MIN_DISPARITY (default: 0) increased to "<<_OCCAM_BM_MIN_DISPARITY<<std::endl;
+      changing_param[0] = OCCAM_BM_SPECKLE_WINDOW_SIZE;
+      changing_param[1] = BM_SPECKLE_WINDOW_SIZE;
+      changing_param_name = stringify(OCCAM_BM_SPECKLE_WINDOW_SIZE);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
-    else if (key == 'b') {
-      _OCCAM_BM_MIN_DISPARITY--;
-      occamSetDeviceValuei(device, OCCAM_BM_MIN_DISPARITY,_OCCAM_BM_MIN_DISPARITY);
-      std::cerr<<"OCCAM_BM_MIN_DISPARITY (default: 0) decreased to "<<_OCCAM_BM_MIN_DISPARITY<<std::endl;
+    else if (key == 't') {
+      changing_param[0] = OCCAM_FILTER_LAMBDA;
+      changing_param[1] = (OccamParam)0;
+      changing_param_name = stringify(OCCAM_FILTER_LAMBDA);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
-    
-    else if (key == 'y') {
-      _OCCAM_BM_NUM_DISPARITIES++;
-      occamSetDeviceValuei(device, OCCAM_BM_NUM_DISPARITIES,_OCCAM_BM_NUM_DISPARITIES);
-      std::cerr<<"OCCAM_BM_NUM_DISPARITIES (default: 64) increased to "<<_OCCAM_BM_NUM_DISPARITIES<<std::endl;
+    else if (key == 'g') {
+      changing_param[0] = OCCAM_FILTER_SIGMA;
+      changing_param[1] = (OccamParam)0;
+      changing_param_name = stringify(OCCAM_FILTER_SIGMA);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
-    else if (key == 'u') {
-      _OCCAM_BM_NUM_DISPARITIES--;
-      occamSetDeviceValuei(device, OCCAM_BM_NUM_DISPARITIES,_OCCAM_BM_NUM_DISPARITIES);
-      std::cerr<<"OCCAM_BM_NUM_DISPARITIES (default: 64) decreased to "<<_OCCAM_BM_NUM_DISPARITIES<<std::endl;
-    }
-    
-    else if (key == 'h') {
-      _OCCAM_BM_TEXTURE_THRESHOLD++;
-      occamSetDeviceValuei(device, OCCAM_BM_TEXTURE_THRESHOLD,_OCCAM_BM_TEXTURE_THRESHOLD);
-      std::cerr<<"OCCAM_BM_TEXTURE_THRESHOLD (default: 10) increased to "<<_OCCAM_BM_TEXTURE_THRESHOLD<<std::endl;
-    }
-    else if (key == 'j') {
-      _OCCAM_BM_TEXTURE_THRESHOLD--;
-      occamSetDeviceValuei(device, OCCAM_BM_TEXTURE_THRESHOLD,_OCCAM_BM_TEXTURE_THRESHOLD);
-      std::cerr<<"OCCAM_BM_TEXTURE_THRESHOLD (default: 10) decreased to "<<_OCCAM_BM_TEXTURE_THRESHOLD<<std::endl;
-    }
-    
-    else if (key == 'n') {
-      _OCCAM_BM_UNIQUENESS_RATIO++;
-      occamSetDeviceValuei(device, OCCAM_BM_UNIQUENESS_RATIO,_OCCAM_BM_UNIQUENESS_RATIO);
-      std::cerr<<"OCCAM_BM_UNIQUENESS_RATIO (default: 60) increased to "<<_OCCAM_BM_UNIQUENESS_RATIO<<std::endl;
-    }
-    else if (key == 'm') {
-      _OCCAM_BM_UNIQUENESS_RATIO--;
-      occamSetDeviceValuei(device, OCCAM_BM_UNIQUENESS_RATIO,_OCCAM_BM_UNIQUENESS_RATIO);
-      std::cerr<<"OCCAM_BM_UNIQUENESS_RATIO (default: 60) decreased to "<<_OCCAM_BM_UNIQUENESS_RATIO<<std::endl;
-    }
-    
-    else if (key == 'i') {
-      _OCCAM_BM_SPECKLE_RANGE+=10;
-      occamSetDeviceValuei(device, OCCAM_BM_SPECKLE_RANGE,_OCCAM_BM_SPECKLE_RANGE);
-      std::cerr<<"OCCAM_BM_SPECKLE_RANGE (default: 120) increased to "<<_OCCAM_BM_SPECKLE_RANGE<<std::endl;
-    }
-    else if (key == 'o') {
-      _OCCAM_BM_SPECKLE_RANGE-=10;
-      occamSetDeviceValuei(device, OCCAM_BM_SPECKLE_RANGE,_OCCAM_BM_SPECKLE_RANGE);
-      std::cerr<<"OCCAM_BM_SPECKLE_RANGE (default: 120) decreased to "<<_OCCAM_BM_SPECKLE_RANGE<<std::endl;
-    }
-    
-    else if (key == 'k') {
-      _OCCAM_BM_SPECKLE_WINDOW_SIZE+=10;
-      occamSetDeviceValuei(device, OCCAM_BM_SPECKLE_WINDOW_SIZE,_OCCAM_BM_SPECKLE_WINDOW_SIZE);
-      std::cerr<<"OCCAM_BM_SPECKLE_WINDOW_SIZE (default: 400) increased to "<<_OCCAM_BM_SPECKLE_WINDOW_SIZE<<std::endl;
-    }
-    else if (key == 'l') {
-      _OCCAM_BM_SPECKLE_WINDOW_SIZE-=10;
-      occamSetDeviceValuei(device, OCCAM_BM_SPECKLE_WINDOW_SIZE,_OCCAM_BM_SPECKLE_WINDOW_SIZE);
-      std::cerr<<"OCCAM_BM_SPECKLE_WINDOW_SIZE (default: 400) decreased to "<<_OCCAM_BM_SPECKLE_WINDOW_SIZE<<std::endl;
+
+    else if ((int)key == 84 || (int)key == 81) { changeParam(device, changing_param, changing_param_name, -1); }
+    else if ((int)key == 82 || (int)key == 83) { changeParam(device, changing_param, changing_param_name, 1); }
+
+    else if (key == 'h') { printHelp(); }
+    else if ((int)key == -1) {}
+    else {
+      printf("unknown key: %d\n", (int)key);
     }
     
   }
