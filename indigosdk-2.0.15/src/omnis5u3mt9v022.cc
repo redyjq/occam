@@ -474,70 +474,78 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         // left_for_matcher = imread("matcher_img/left_for_matcher2.jpg", IMREAD_UNCHANGED);
         // right_for_matcher = imread("matcher_img/right_for_matcher2.jpg", IMREAD_UNCHANGED);
 
-        printf("#################################################\n");
-        printf("bm_sad_window_size: %d\n", bm_sad_window_size);        
-        printf("bm_prefilter_size: %d\n", bm_prefilter_size);        
-        printf("bm_prefilter_cap: %d\n", bm_prefilter_cap);                
-        printf("bm_sad_window_size: %d\n", bm_sad_window_size);                
-        printf("bm_min_disparity: %d\n", bm_min_disparity);                
-        printf("bm_num_disparities: %d\n", bm_num_disparities);        
-        printf("bm_texture_threshold: %d\n", bm_texture_threshold);        
-        printf("bm_uniqueness_ratio: %d\n", bm_uniqueness_ratio);                
-        printf("bm_speckle_range: %d\n", bm_speckle_range);                
-        printf("bm_speckle_window_size: %d\n", bm_speckle_window_size);
-
-        printf("filter_lambda: %d\n", filter_lambda*1000);
-        printf("filter_sigma: %.1f\n", (double)filter_sigma*.1);
-        printf("#################################################\n");
-
+        auto max_disp = 64;
+        auto wsize = 15;
+        printf("wsize: %d\n", wsize);
+        
         // StereoBM
-        Ptr<StereoBM> left_matcher = StereoBM::create(bm_num_disparities,bm_sad_window_size);
-
-        // StereoSGBM
-        // Ptr<StereoSGBM> left_matcher = StereoSGBM::create(0,bm_num_disparities,bm_sad_window_size);
-
+        Ptr<StereoBM> left_matcher = StereoBM::create(max_disp,wsize);
         Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
 
-        left_matcher->setPreFilterSize(bm_prefilter_size);
-        left_matcher->setTextureThreshold(bm_texture_threshold);
-        
-        left_matcher->setPreFilterCap(bm_prefilter_cap);
-        left_matcher->setBlockSize(bm_sad_window_size);
-        left_matcher->setMinDisparity(bm_min_disparity);
-        left_matcher->setNumDisparities(bm_num_disparities);
-        left_matcher->setUniquenessRatio(bm_uniqueness_ratio);
-        left_matcher->setSpeckleRange(bm_speckle_range);
-        left_matcher->setSpeckleWindowSize(bm_speckle_window_size);
-
-        right_matcher->setBlockSize(bm_sad_window_size);
-        right_matcher->setMinDisparity(bm_min_disparity);
-        right_matcher->setNumDisparities(bm_num_disparities);
-        right_matcher->setSpeckleRange(bm_speckle_range);
-        right_matcher->setSpeckleWindowSize(bm_speckle_window_size);
-
         // StereoSGBM
-        // left_matcher->setP1(24*bm_sad_window_size*bm_sad_window_size);
-        // left_matcher->setP2(96*bm_sad_window_size*bm_sad_window_size);
+        // Ptr<StereoSGBM> left_matcher = StereoSGBM::create(0,max_disp,wsize);
+        // left_matcher->setUniquenessRatio(60);
+        // // left_matcher->setTextureThreshold(10);
+        // // left_matcher->setDisp12MaxDiff(1000000);
+        // // left_matcher->setSpeckleWindowSize(400);
+        // left_matcher->setP1(24*wsize*wsize);
+        // left_matcher->setP2(96*wsize*wsize);
+        // left_matcher->setPreFilterCap(63);
         // left_matcher->setMode(StereoSGBM::MODE_SGBM_3WAY);
+        // wls_filter = createDisparityWLSFilter(left_matcher);
+        // Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
+        // matching_time = (double)getTickCount();
+        // left_matcher-> compute(left_for_matcher, right_for_matcher,left_disp);
+        // right_matcher->compute(right_for_matcher,left_for_matcher, right_disp);
+        // matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
 
-        //! [matching]
-        matching_time = (double)getTickCount();
-        left_matcher->compute(left_for_matcher, right_for_matcher, left_disp);
-        right_matcher->compute(right_for_matcher, left_for_matcher, right_disp);
-        matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
-        // printf("matching_time: %.3f\n", matching_time);
-        //! [matching]
+        printf("#################################################\n");
+        printf("bm_sad_window_size: %d\n", bm_sad_window_size);
+        left_matcher->setPreFilterSize(bm_prefilter_size);
+        printf("bm_prefilter_size: %d\n", bm_prefilter_size);
+        left_matcher->setPreFilterCap(bm_prefilter_cap);
+        printf("bm_prefilter_cap: %d\n", bm_prefilter_cap);
+        left_matcher->setBlockSize(bm_sad_window_size);
+        right_matcher->setBlockSize(bm_sad_window_size);
+        printf("bm_sad_window_size: %d\n", bm_sad_window_size);
+        left_matcher->setMinDisparity(bm_min_disparity);
+        right_matcher->setMinDisparity(bm_min_disparity);
+        printf("bm_min_disparity: %d\n", bm_min_disparity);
+        left_matcher->setNumDisparities(bm_num_disparities);
+        right_matcher->setNumDisparities(bm_num_disparities);
+        printf("bm_num_disparities: %d\n", bm_num_disparities);
+        left_matcher->setTextureThreshold(bm_texture_threshold);
+        printf("bm_texture_threshold: %d\n", bm_texture_threshold);
+        left_matcher->setUniquenessRatio(bm_uniqueness_ratio);
+        printf("bm_uniqueness_ratio: %d\n", bm_uniqueness_ratio);
+        left_matcher->setSpeckleRange(bm_speckle_range);
+        right_matcher->setSpeckleRange(bm_speckle_range);
+        printf("bm_speckle_range: %d\n", bm_speckle_range);
+        left_matcher->setSpeckleWindowSize(bm_speckle_window_size);
+        right_matcher->setSpeckleWindowSize(bm_speckle_window_size);
+        printf("bm_speckle_window_size: %d\n", bm_speckle_window_size);
 
         //! [filtering]
         wls_filter = createDisparityWLSFilter(left_matcher);
+        printf("filter_lambda: %d\n", filter_lambda*1000);
         wls_filter->setLambda(filter_lambda*1000);
+        printf("filter_sigma: %.1f\n", (double)filter_sigma*.1);
         wls_filter->setSigmaColor((double)filter_sigma*.1);
+        printf("#################################################\n");
+
+        matching_time = (double)getTickCount();
+        left_matcher->compute(left_for_matcher, right_for_matcher,left_disp);
+        right_matcher->compute(right_for_matcher, left_for_matcher, right_disp);
+        matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
+
+        printf("matching_time: %.3f\n", matching_time);
+
         filtering_time = (double)getTickCount();
         wls_filter->filter(left_disp,left_for_matcher,filtered_disp,right_disp);
         filtering_time = ((double)getTickCount() - filtering_time)/getTickFrequency();
-        conf_map = wls_filter->getConfidenceMap();
-        // printf("filtering_time: %.3f\n", filtering_time);
         //! [filtering]
+        conf_map = wls_filter->getConfidenceMap();
+        printf("filtering_time: %.3f\n", filtering_time);
 
         // OccamImage* disp = 0;
         // IOccamStereo* stereo_iface = 0;
