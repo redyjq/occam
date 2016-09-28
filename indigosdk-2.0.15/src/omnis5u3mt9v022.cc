@@ -462,6 +462,11 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         }
 
         Mat left_for_matcher, right_for_matcher;
+         // left_for_matcher  = left.clone();
+        // right_for_matcher = right.clone();
+        left_for_matcher = imread("img/mono/left_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
+        right_for_matcher = imread("img/mono/right_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
+
         Mat left_disp,right_disp;
         Mat filtered_disp;
         Mat conf_map = Mat(left_for_matcher.rows,left_for_matcher.cols,CV_8U);
@@ -469,27 +474,18 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         Ptr<DisparityWLSFilter> wls_filter;
         double matching_time, filtering_time;
 
-        left_for_matcher  = left.clone();
-        right_for_matcher = right.clone();
-        // left_for_matcher = imread("matcher_img/left_for_matcher2.jpg", IMREAD_UNCHANGED);
-        // right_for_matcher = imread("matcher_img/right_for_matcher2.jpg", IMREAD_UNCHANGED);
-
-        auto max_disp = 64;
-        auto wsize = 15;
-        printf("wsize: %d\n", wsize);
-        
         // StereoBM
-        Ptr<StereoBM> left_matcher = StereoBM::create(max_disp,wsize);
+        Ptr<StereoBM> left_matcher = StereoBM::create(bm_num_disparities,bm_sad_window_size);
         Ptr<StereoMatcher> right_matcher = createRightMatcher(left_matcher);
 
         // StereoSGBM
-        // Ptr<StereoSGBM> left_matcher = StereoSGBM::create(0,max_disp,wsize);
+        // Ptr<StereoSGBM> left_matcher = StereoSGBM::create(0,bm_num_disparities,bm_sad_window_size);
         // left_matcher->setUniquenessRatio(60);
         // // left_matcher->setTextureThreshold(10);
         // // left_matcher->setDisp12MaxDiff(1000000);
         // // left_matcher->setSpeckleWindowSize(400);
-        // left_matcher->setP1(24*wsize*wsize);
-        // left_matcher->setP2(96*wsize*wsize);
+        // left_matcher->setP1(24*bm_sad_window_size*bm_sad_window_size);
+        // left_matcher->setP2(96*bm_sad_window_size*bm_sad_window_size);
         // left_matcher->setPreFilterCap(63);
         // left_matcher->setMode(StereoSGBM::MODE_SGBM_3WAY);
         // wls_filter = createDisparityWLSFilter(left_matcher);
