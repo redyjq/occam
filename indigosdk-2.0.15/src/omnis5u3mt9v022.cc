@@ -495,21 +495,22 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         // right_matcher->compute(right_for_matcher,left_for_matcher, right_disp);
         // matching_time = ((double)getTickCount() - matching_time)/getTickFrequency();
 
-        printf("#################################################\n");
-        printf("bm_sad_window_size: %d\n", bm_sad_window_size);
-        printf("bm_prefilter_size: %d\n", bm_prefilter_size);
-        printf("bm_prefilter_cap: %d\n", bm_prefilter_cap);
-        printf("bm_sad_window_size: %d\n", bm_sad_window_size);
-        printf("bm_min_disparity: %d\n", bm_min_disparity);
-        printf("bm_num_disparities: %d\n", bm_num_disparities);
-        printf("bm_texture_threshold: %d\n", bm_texture_threshold);
-        printf("bm_uniqueness_ratio: %d\n", bm_uniqueness_ratio);
-        printf("bm_speckle_range: %d\n", bm_speckle_range);
-        printf("bm_speckle_window_size: %d\n", bm_speckle_window_size);
-        printf("filter_lambda: %d\n", filter_lambda*1000);
-        printf("filter_sigma: %.1f\n", (double)filter_sigma*.1);
-        printf("#################################################\n");
+        // printf("#################################################\n");
+        // printf("bm_sad_window_size: %d\n", bm_sad_window_size);
+        // printf("bm_prefilter_size: %d\n", bm_prefilter_size);
+        // printf("bm_prefilter_cap: %d\n", bm_prefilter_cap);
+        // printf("bm_sad_window_size: %d\n", bm_sad_window_size);
+        // printf("bm_min_disparity: %d\n", bm_min_disparity);
+        // printf("bm_num_disparities: %d\n", bm_num_disparities);
+        // printf("bm_texture_threshold: %d\n", bm_texture_threshold);
+        // printf("bm_uniqueness_ratio: %d\n", bm_uniqueness_ratio);
+        // printf("bm_speckle_range: %d\n", bm_speckle_range);
+        // printf("bm_speckle_window_size: %d\n", bm_speckle_window_size);
+        // printf("filter_lambda: %d\n", filter_lambda*1000);
+        // printf("filter_sigma: %.1f\n", (double)filter_sigma*.1);
+        // printf("#################################################\n");
         
+        left_matcher->setPreFilterType(StereoBM::PREFILTER_XSOBEL);
         left_matcher->setPreFilterSize(bm_prefilter_size);
         left_matcher->setPreFilterCap(bm_prefilter_cap);
         left_matcher->setBlockSize(bm_sad_window_size);
@@ -547,11 +548,6 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         // occamGetInterface(stereo_handle.get(),IOCCAMSTEREO,(void**)&stereo_iface);
         // stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
 
-        if(index == 0) {
-            imshow("filtered_disp", filtered_disp);
-            waitKey(1);
-        }
-
         filtered_disp.convertTo(filtered_disp, CV_16SC1);
         OccamImage* disp_cv = cvMatToOccamImage(filtered_disp);
 
@@ -562,6 +558,12 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         imwrite("img/disp/filtered_disp"+std::to_string(index)+".jpg", filtered_disp);
         imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
         imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
+
+        if(index == 0) { // || index == 1) {
+            filtered_disp.convertTo(filtered_disp, CV_8UC1);
+            imshow("filtered_disp"+std::to_string(index), filtered_disp);
+            waitKey(1);
+        }
 
         return std::shared_ptr<OccamImage>(disp_cv);
     };  
@@ -894,22 +896,68 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         return wire_fps;
     };
 
+    int nextVal(std::vector<int> vec, int value, int last) {
+        std::vector<int> diff;
+        for (auto i = vec.begin(); i != vec.end(); ++i) { diff.push_back(abs(value-*i)); }
+        auto idx = std::distance(diff.begin(), std::min_element(diff.begin(), diff.end()));
+        int min_count = 0; for(auto it = diff.begin(); it != diff.end() ; ++it) { if (*it==diff[idx]) { min_count++; } }
+        if (min_count > 1) {
+            if (value < last)
+                idx++;
+        }
+        if (value == vec[idx]) { return vec[idx]; }
+        else if (value > last) { return idx >= vec.size()-1 ? vec[vec.size()-1] : vec[idx+1]; }
+        else if (value < last) { return idx <= 0 ? vec[0] : vec[idx-1]; }
+    }
+
+    
     int get_bm_prefilter_size() { return bm_prefilter_size; }
-    void set_bm_prefilter_size(int value) { bm_prefilter_size = value; }
+    // preFilterSize must be odd and be within 5..255
+    void set_bm_prefilter_size(int value) {
+        vector<int> vec;
+        for(int i=5; i <= 255; i+=2) { vec.push_back(i); }
+        bm_prefilter_size = nextVal(vec, value, bm_prefilter_size);
+    }
+    
     int get_bm_prefilter_cap() { return bm_prefilter_cap; }
-    void set_bm_prefilter_cap(int value) { bm_prefilter_cap = value; }
+    // preFilterCap must be within 1..63
+    void set_bm_prefilter_cap(int value) {
+        vector<int> vec;
+        for(int i=1; i <= 63; i++) { vec.push_back(i); }
+        bm_prefilter_cap = nextVal(vec, value, bm_prefilter_cap);
+    }
+    
     int get_bm_sad_window_size() { return bm_sad_window_size; }
-    void set_bm_sad_window_size(int value) { bm_sad_window_size = value; }
+    // SADWindowSize must be odd, be within 5..255 and be not larger than image width or height in function compute
+    void set_bm_sad_window_size(int value) { 
+        vector<int> vec;
+        for(int i=5; i <= 255; i+=2) { vec.push_back(i); }
+        bm_sad_window_size = nextVal(vec, value, bm_sad_window_size);
+    }
+    
     int get_bm_min_disparity() { return bm_min_disparity; }
     void set_bm_min_disparity(int value) { bm_min_disparity = value; }
+    
     int get_bm_num_disparities() { return bm_num_disparities; }
-    void set_bm_num_disparities(int value) { bm_num_disparities = value; }
+    // numDisparities must be positive and divisble by 16
+    void set_bm_num_disparities(int value) {
+        vector<int> vec;
+        for(int i=16; i <= 256; i+=16) { vec.push_back(i); }
+        bm_num_disparities = nextVal(vec, value, bm_num_disparities);
+        bm_num_disparities = value;
+    }
+    
     int get_bm_texture_threshold() { return bm_texture_threshold; }
-    void set_bm_texture_threshold(int value) { bm_texture_threshold = value; }
+    // texture threshold must be non-negative
+    void set_bm_texture_threshold(int value) { bm_texture_threshold = value >= 0 ? value : 0; }
+    
     int get_bm_uniqueness_ratio() { return bm_uniqueness_ratio; }
-    void set_bm_uniqueness_ratio(int value) { bm_uniqueness_ratio = value; }
+    // uniqueness ratio must be non-negative
+    void set_bm_uniqueness_ratio(int value) { bm_uniqueness_ratio = value >= 0 ? value : 0; }
+    
     int get_bm_speckle_range() { return bm_speckle_range; }
     void set_bm_speckle_range(int value) { bm_speckle_range = value; }
+    
     int get_bm_speckle_window_size() { return bm_speckle_window_size; }
     void set_bm_speckle_window_size(int value) { bm_speckle_window_size = value; }
 
@@ -1537,11 +1585,11 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         out.set(OCCAM_RECTIFIED_IMAGE9,img1_mon4r);
 
         std::shared_ptr<void> stereo_handle = module(OCCAM_STEREO_MATCHER0);
-        auto disp0 = computeDisparityImage4(stereo_handle,0,img0_mon0r,img1_mon0r);
-        auto disp1 = computeDisparityImage4(stereo_handle,1,img0_mon1r,img1_mon1r);
-        auto disp2 = computeDisparityImage4(stereo_handle,2,img0_mon2r,img1_mon2r);
-        auto disp3 = computeDisparityImage4(stereo_handle,3,img0_mon3r,img1_mon3r);
-        auto disp4 = computeDisparityImage4(stereo_handle,4,img0_mon4r,img1_mon4r);
+        // auto disp0 = computeDisparityImage(stereo_handle,0,img0_mon0r,img1_mon0r);
+        // auto disp1 = computeDisparityImage(stereo_handle,1,img0_mon1r,img1_mon1r);
+        // auto disp2 = computeDisparityImage(stereo_handle,2,img0_mon2r,img1_mon2r);
+        // auto disp3 = computeDisparityImage(stereo_handle,3,img0_mon3r,img1_mon3r);
+        // auto disp4 = computeDisparityImage(stereo_handle,4,img0_mon4r,img1_mon4r);
 
         // **************************** Stereo Params ****************************
         int bm_prefilter_size = get_bm_prefilter_size();
@@ -1566,11 +1614,11 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         // *******************************************************************************
 
         // **************************** StereoBM matching ****************************
-        // auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        // auto disp1 = computeDisparityImage2(stereo_handle,1,img0_mon1r,img1_mon1r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        // auto disp2 = computeDisparityImage2(stereo_handle,2,img0_mon2r,img1_mon2r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        // auto disp3 = computeDisparityImage2(stereo_handle,3,img0_mon3r,img1_mon3r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        // auto disp4 = computeDisparityImage2(stereo_handle,4,img0_mon4r,img1_mon4r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp1 = computeDisparityImage2(stereo_handle,1,img0_mon1r,img1_mon1r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp2 = computeDisparityImage2(stereo_handle,2,img0_mon2r,img1_mon2r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp3 = computeDisparityImage2(stereo_handle,3,img0_mon3r,img1_mon3r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp4 = computeDisparityImage2(stereo_handle,4,img0_mon4r,img1_mon4r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
        // *******************************************************************************
 
         auto disp0r = unrectifyImage(rectify_handle,0,disp0);
