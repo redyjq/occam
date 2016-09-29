@@ -354,8 +354,15 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         int index,
         DeferredImage img0r,
         DeferredImage img1r,
+        int bm_prefilter_size,
+        int bm_prefilter_cap,
         int bm_sad_window_size,
+        int bm_min_disparity,
         int bm_num_disparities,
+        int bm_texture_threshold,
+        int bm_uniqueness_ratio,
+        int bm_speckle_range,
+        int bm_speckle_window_size,
         int filter_lambda,
         int filter_sigma) {
     auto gen_fn = [=](){
@@ -387,7 +394,28 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         Rect ROI;
         Ptr<DisparityWLSFilter> wls_filter;
         
-        Ptr<StereoBM> matcher  = StereoBM::create(bm_num_disparities,bm_sad_window_size);
+        Ptr<StereoBM> matcher = StereoBM::create(bm_num_disparities,bm_sad_window_size);
+        // StereoBM
+        matcher->setPreFilterType(StereoBM::PREFILTER_XSOBEL);
+        matcher->setPreFilterSize(bm_prefilter_size);
+        matcher->setTextureThreshold(bm_texture_threshold);
+
+        // // StereoSGBM
+        // Ptr<StereoSGBM> matcher = StereoSGBM::create(0,bm_num_disparities,bm_sad_window_size);
+        // matcher->setDisp12MaxDiff(1000000);
+        // matcher->setP1(24*bm_sad_window_size*bm_sad_window_size);
+        // matcher->setP2(96*bm_sad_window_size*bm_sad_window_size);
+        // matcher->setMode(StereoSGBM::MODE_SGBM_3WAY);
+
+        matcher->setPreFilterCap(bm_prefilter_cap);
+        matcher->setBlockSize(bm_sad_window_size);        
+        matcher->setMinDisparity(bm_min_disparity);        
+        matcher->setNumDisparities(bm_num_disparities);        
+        matcher->setUniquenessRatio(bm_uniqueness_ratio);
+        matcher->setSpeckleRange(bm_speckle_range);        
+        matcher->setSpeckleWindowSize(bm_speckle_window_size);
+
+>>>>>>> b23044c... test just disp filter, filtered disp is black most of the time
         ROI = computeROI(left_for_matcher.size(),matcher);
         wls_filter = createDisparityWLSFilterGeneric(false);
         wls_filter->setDepthDiscontinuityRadius((int)ceil(0.33*bm_sad_window_size));
@@ -420,10 +448,15 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         filtered_disp.convertTo(filtered_disp, CV_16SC1);
         OccamImage* filtered_disp_OI = cvMatToOccamImage(filtered_disp);
 
-        imwrite("img/disp/filtered_disp"+std::to_string(index)+".jpg", filtered_disp);
+        imwrite("img/disp/filtered/filtered_disp"+std::to_string(index)+".jpg", filtered_disp);
         imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
         imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
 
+        if(index == 0) { // || index == 1) {
+            filtered_disp.convertTo(filtered_disp, CV_8UC1);
+            imshow("filtered_disp"+std::to_string(index), filtered_disp);
+            waitKey(1);
+        }
 
         return std::shared_ptr<OccamImage>(filtered_disp_OI);
     };  
@@ -1576,20 +1609,20 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         // *******************************************************************************
 
         // **************************** Disparity Filtering ****************************
-        // auto disp0 = computeDisparityImage3(stereo_handle,0,img0_mon0r,img1_mon0r,bm_sad_window_size,bm_min_disparity,lambda,sigma);
-        // auto disp1 = computeDisparityImage3(stereo_handle,1,img0_mon1r,img1_mon1r,bm_sad_window_size,bm_min_disparity,lambda,sigma);
-        // auto disp2 = computeDisparityImage3(stereo_handle,2,img0_mon2r,img1_mon2r,bm_sad_window_size,bm_min_disparity,lambda,sigma);
-        // auto disp3 = computeDisparityImage3(stereo_handle,3,img0_mon3r,img1_mon3r,bm_sad_window_size,bm_min_disparity,lambda,sigma);
-        // auto disp4 = computeDisparityImage3(stereo_handle,4,img0_mon4r,img1_mon4r,bm_sad_window_size,bm_min_disparity,lambda,sigma);
+        auto disp0 = computeDisparityImage3(stereo_handle,0,img0_mon0r,img1_mon0r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp1 = computeDisparityImage3(stereo_handle,1,img0_mon1r,img1_mon1r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp2 = computeDisparityImage3(stereo_handle,2,img0_mon2r,img1_mon2r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp3 = computeDisparityImage3(stereo_handle,3,img0_mon3r,img1_mon3r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        auto disp4 = computeDisparityImage3(stereo_handle,4,img0_mon4r,img1_mon4r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
         // *******************************************************************************
 
         // **************************** StereoBM matching ****************************
-        auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        auto disp1 = computeDisparityImage2(stereo_handle,1,img0_mon1r,img1_mon1r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        auto disp2 = computeDisparityImage2(stereo_handle,2,img0_mon2r,img1_mon2r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        auto disp3 = computeDisparityImage2(stereo_handle,3,img0_mon3r,img1_mon3r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-        auto disp4 = computeDisparityImage2(stereo_handle,4,img0_mon4r,img1_mon4r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-       // *******************************************************************************
+        // auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        // auto disp1 = computeDisparityImage2(stereo_handle,1,img0_mon1r,img1_mon1r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        // auto disp2 = computeDisparityImage2(stereo_handle,2,img0_mon2r,img1_mon2r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        // auto disp3 = computeDisparityImage2(stereo_handle,3,img0_mon3r,img1_mon3r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        // auto disp4 = computeDisparityImage2(stereo_handle,4,img0_mon4r,img1_mon4r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
+        // *******************************************************************************
 
         auto disp0r = unrectifyImage(rectify_handle,0,disp0);
         auto disp1r = unrectifyImage(rectify_handle,2,disp1);
