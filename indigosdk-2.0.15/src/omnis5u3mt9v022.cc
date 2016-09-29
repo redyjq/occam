@@ -464,8 +464,8 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         Mat left_for_matcher, right_for_matcher;
          // left_for_matcher  = left.clone();
         // right_for_matcher = right.clone();
-        left_for_matcher = imread("img/mono/left_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
-        right_for_matcher = imread("img/mono/right_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
+        left_for_matcher = imread("img 2016-09-28 20:02/mono/left_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
+        right_for_matcher = imread("img 2016-09-28 20:02/mono/right_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
 
         Mat left_disp,right_disp;
         Mat filtered_disp;
