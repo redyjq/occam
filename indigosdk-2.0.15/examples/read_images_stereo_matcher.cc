@@ -307,8 +307,8 @@ int main(int argc, const char** argv) {
   time_t last_reset = 0;
 
   // init to start img
-  auto start = OCCAM_STITCHED_IMAGE1;
-  // auto start = OCCAM_STITCHED_DISPARITY_IMAGE;
+  // auto start = OCCAM_STITCHED_IMAGE1;
+  auto start = OCCAM_STITCHED_DISPARITY_IMAGE;
   int pos = std::find(image_req.begin(), image_req.end(), start) - image_req.begin();
   if( pos < image_req.size() ) {
     current_req_index = pos;
@@ -331,8 +331,8 @@ int main(int argc, const char** argv) {
   changing_param[1] = (OccamParam)0;
   std::string changing_param_name = stringify(OCCAM_FILTER_LAMBDA);
 
-  // for (i=0;;++i) {
-  for (i=0; i<10; ++i) {
+  for (i=0;;++i) {
+  // for (i=0; i<10; ++i) {
     image = 0;
     if ((r = occamDeviceReadData(device,1,&image_req[current_req_index],0,
          (void**)&image, 1)) != OCCAM_API_SUCCESS) {
