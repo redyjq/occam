@@ -441,23 +441,47 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         filtering_time = (double)getTickCount();
         wls_filter->filter(disp_cv,left_for_matcher,filtered_disp,Mat(),ROI);
         filtering_time = ((double)getTickCount() - filtering_time)/getTickFrequency();
+
+        // filtered_disp.setTo(cv::Scalar(255,255,255));
         
         // printf("matching_time: %.3f\n", matching_time);
         // printf("filtering_time: %.3f\n", filtering_time);
 
         filtered_disp.convertTo(filtered_disp, CV_16SC1);
+
+        
+        // // TODO: test if non-zero and release before allocating new memory
+        // imageData = (unsigned char*) malloc(filtered_disp.cols*filtered_disp.rows*3*sizeof(unsigned char)); // allocate memory for your image
+        // // TODO: maybe it is possible to get the size of "filtered_disp"'s data directly, which would be much better because of widthStep things, etc. The formula "filtered_disp.cols*filtered_disp.rows*3*sizeof(unsigned char)" might not be correct for all kind of input images!
+        // // create Mat header that uses present memory
+        // image=cv::Mat(filtered_disp.rows, filtered_disp.cols, 3, imageData  );
+        // // copy loaded image to allocated memory:
+        // filtered_disp.copyTo(image); // here you must be sure that "image" is big enough to hold "filtered_disp"'s data. Otherwise a new Mat will be created.
+        // // filtered_disp will be cleared automatically
+
+
         OccamImage* filtered_disp_OI = cvMatToOccamImage(filtered_disp);
 
-        imwrite("img/disp/filtered/filtered_disp"+std::to_string(index)+".jpg", filtered_disp);
+        // int ZeroPixels = TotalNumberOfPixels - countNonZero(filtered_disp);
+        // printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ZeroPixels: %d\n", ZeroPixels);
+
+        Mat bw;
+        filtered_disp.convertTo(bw, CV_8UC1);
+        threshold(bw, bw, 40, 255, CV_THRESH_BINARY);
+        int total = filtered_disp.rows * filtered_disp.cols;
+        int c = countNonZero(bw);
+        // printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ c: %d\n", c);
+        if(c > total*.025) {
+            imwrite("img/disp/filtered/filtered_disp"+std::to_string(index)+".jpg", filtered_disp);
+            if(index == 0) { // || index == 1) {
+                filtered_disp.convertTo(filtered_disp, CV_8UC1);
+                imshow("filtered_disp"+std::to_string(index), filtered_disp);
+                imshow("bw", bw);
+                waitKey(1);
+            }
+        }
         imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
         imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
-
-        if(index == 0) { // || index == 1) {
-            filtered_disp.convertTo(filtered_disp, CV_8UC1);
-            imshow("filtered_disp"+std::to_string(index), filtered_disp);
-            waitKey(1);
-        }
-
         return std::shared_ptr<OccamImage>(filtered_disp_OI);
     };  
     return DeferredImage(gen_fn,img0r,img1r);
