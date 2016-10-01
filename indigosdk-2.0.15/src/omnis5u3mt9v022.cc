@@ -426,7 +426,6 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         if (left_for_matcher.empty() || disp_cv.empty()) {
             printf("Error: img empty\n");
         }
-        occamFreeImage(disp);
         
         Mat filtered_disp;
         Rect ROI;
@@ -475,57 +474,48 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         wls_filter->setSigmaColor((double)filter_sigma*.1);
         printf("#################################################\n");
 
-        filtering_time = (double)getTickCount();
-        wls_filter->filter(disp_cv,left_for_matcher,filtered_disp,Mat(),ROI);
-        filtering_time = ((double)getTickCount() - filtering_time)/getTickFrequency();
+        // filtering_time = (double)getTickCount();
+        // wls_filter->filter(disp_cv,left_for_matcher,filtered_disp,Mat(),ROI);
+        // filtering_time = ((double)getTickCount() - filtering_time)/getTickFrequency();
+        filtered_disp = disp_cv.clone();
 
         // filtered_disp.setTo(cv::Scalar(255,255,255));
+        int r = rand() % 256;
+        int b = rand() % 256;
+        int g = rand() % 256;
+        // filtered_disp.setTo(Scalar(r,b,g));
         
         // printf("matching_time: %.3f\n", matching_time);
         // printf("filtering_time: %.3f\n", filtering_time);
 
         filtered_disp.convertTo(filtered_disp, CV_16SC1);
 
-        // Mat image;
-        // unsigned char* imageData;
-        // // TODO: test if non-zero and release before allocating new memory
-        // imageData = (unsigned char*) occamAlloc(filtered_disp.cols*filtered_disp.rows*3*sizeof(unsigned char)); // allocate memory for your image
-        // // TODO: maybe it is possible to get the size of "filtered_disp"'s data directly, which would be much better because of widthStep things, etc. The formula "filtered_disp.cols*filtered_disp.rows*3*sizeof(unsigned char)" might not be correct for all kind of input images!
-        // // create Mat header that uses present memory
-        // Mat img = Mat(filtered_disp.rows, filtered_disp.cols, 3, imageData);
-        // // copy loaded img to allocated memory:
-        // filtered_disp.copyTo(img); // here you must be sure that "img" is big enough to hold "filtered_disp"'s data. Otherwise a new Mat will be created.
-        // // filtered_disp will be cleared automatically
-
-
         OccamImage* filtered_disp_OI = new OccamImage;
         convertImage(filtered_disp, filtered_disp_OI);
-		// int bpp = 1;
-		// occamImageFormatBytesPerPixel(filtered_disp_OI->format, &bpp);
         OccamImage* filtered_disp_OI_copy;
 		occamCopyImage(filtered_disp_OI, &filtered_disp_OI_copy, 1);
-		// occamFreeImage(filtered_disp_OI);
-
-        // int ZeroPixels = TotalNumberOfPixels - countNonZero(filtered_disp);
-        // printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ZeroPixels: %d\n", ZeroPixels);
 
         Mat bw;
         filtered_disp.convertTo(bw, CV_8UC1);
         threshold(bw, bw, 40, 255, CV_THRESH_BINARY);
         int total = filtered_disp.rows * filtered_disp.cols;
         int c = countNonZero(bw);
-        // printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ c: %d\n", c);
         if(c > total*.025) {
             imwrite("img/disp/filtered/filtered_disp"+std::to_string(index)+".jpg", filtered_disp);
             if(index == 0) { // || index == 1) {
                 filtered_disp.convertTo(filtered_disp, CV_8UC1);
                 imshow("filtered_disp"+std::to_string(index), filtered_disp);
+<<<<<<< HEAD
                 imshow("bw", bw);
+=======
+                // imshow("bw", bw);
+>>>>>>> 0af99b0... fixed another memory issue, freed occam img too soon
                 waitKey(1);
             }
         }
         imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
         imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
+        occamFreeImage(disp);
         // return filtered_disp;
         return std::shared_ptr<OccamImage>(filtered_disp_OI_copy, occamFreeImage);
     };  
@@ -562,10 +552,10 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         }
 
         Mat left_for_matcher, right_for_matcher;
-         // left_for_matcher  = left.clone();
-        // right_for_matcher = right.clone();
-        left_for_matcher = imread("img_2016-09-28_20:02/mono/left_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
-        right_for_matcher = imread("img_2016-09-28_20:02/mono/right_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
+         left_for_matcher  = left.clone();
+        right_for_matcher = right.clone();
+        // left_for_matcher = imread("img_2016-09-28_20:02/mono/left_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
+        // right_for_matcher = imread("img_2016-09-28_20:02/mono/right_for_matcher"+std::to_string(index)+".jpg", IMREAD_UNCHANGED);
 
         Mat left_disp,right_disp;
         Mat filtered_disp;
@@ -637,10 +627,12 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         // stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
 
         filtered_disp.convertTo(filtered_disp, CV_16SC1);
-        OccamImage* disp_cv = new OccamImage;
-        convertImage(filtered_disp, disp_cv);
+        OccamImage* filtered_disp_OI = new OccamImage;
+        convertImage(filtered_disp, filtered_disp_OI);
+        OccamImage* filtered_disp_OI_copy;
+		occamCopyImage(filtered_disp_OI, &filtered_disp_OI_copy, 1);
 
-        // Mat test_cv = occamImageToCvMat(disp_cv);
+        // Mat test_cv = occamImageToCvMat(filtered_disp_OI);
         // Mat test = occamImageToCvMat(disp);
         imwrite("img/disp/left/left_disp"+std::to_string(index)+".jpg", left_disp);
         imwrite("img/disp/right/right_disp"+std::to_string(index)+".jpg", right_disp);
@@ -654,7 +646,7 @@ static DeferredImage computeDisparityImage2(std::shared_ptr<void> stereo_handle,
         //     waitKey(1);
         // }
 
-        return std::shared_ptr<OccamImage>(disp_cv);
+        return std::shared_ptr<OccamImage>(filtered_disp_OI_copy, occamFreeImage);
     };  
     return DeferredImage(gen_fn,img0r,img1r);
 }
@@ -1684,27 +1676,7 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         auto disp2 = computeDisparityImage3(stereo_handle,2,img0_mon2r,img1_mon2r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
         auto disp3 = computeDisparityImage3(stereo_handle,3,img0_mon3r,img1_mon3r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
         auto disp4 = computeDisparityImage3(stereo_handle,4,img0_mon4r,img1_mon4r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
-		// auto disp0 = j
-		// auto disp1 = j
-		// auto disp2 = j
-		// auto disp3 = j
-		// auto disp4 = j
-
-
-		// auto gen_fn = [=](){
-		// 	OccamImage* disp = new OccamImage;
-		// 	convertImage(disp_cv0, disp);
-		// 	return std::shared_ptr<OccamImage>(disp);
-		// };  
-		// auto disp0 = DeferredImage(gen_fn,img0_mon0r,img1_mon0r);
-
-  //       // *******************************************************************************
-  //       Mat m = occamImageToCvMat(disp0->get());
-  //       m.convertTo(m, CV_8UC1);
-  //       if(!m.empty()) {
-	 //        imshow("m", m);
-	 //        waitKey(1);
-  //       }
+        // *******************************************************************************
 
         // **************************** StereoBM matching ****************************
         // auto disp0 = computeDisparityImage2(stereo_handle,0,img0_mon0r,img1_mon0r,bm_prefilter_size,bm_prefilter_cap,bm_sad_window_size,bm_min_disparity,bm_num_disparities,bm_texture_threshold,bm_uniqueness_ratio,bm_speckle_range,bm_speckle_window_size,lambda,sigma);
