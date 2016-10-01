@@ -313,7 +313,8 @@ typedef enum _OccamStorageClass {
 typedef enum _OccamDataType {
   OCCAM_MARKERS = 1,
   OCCAM_IMAGE = 2,
-  OCCAM_POINT_CLOUD = 3
+  OCCAM_POINT_CLOUD = 3,
+  OCCAM_CV_IMAGE = 4
 } OccamDataType;
 
 /*!
