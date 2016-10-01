@@ -498,11 +498,13 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         // // filtered_disp will be cleared automatically
 
 
-        OccamImage* filtered_disp_OI1 = new OccamImage;
-        convertImage(filtered_disp, filtered_disp_OI1);
         OccamImage* filtered_disp_OI = new OccamImage;
-        deepCopyImage(filtered_disp_OI1, filtered_disp_OI);
-        // deepCopyImage
+        convertImage(filtered_disp, filtered_disp_OI);
+		// int bpp = 1;
+		// occamImageFormatBytesPerPixel(filtered_disp_OI->format, &bpp);
+        OccamImage* filtered_disp_OI_copy;
+		occamCopyImage(filtered_disp_OI, &filtered_disp_OI_copy, 1);
+		// occamFreeImage(filtered_disp_OI);
 
         // int ZeroPixels = TotalNumberOfPixels - countNonZero(filtered_disp);
         // printf("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ZeroPixels: %d\n", ZeroPixels);
@@ -525,7 +527,7 @@ static DeferredImage computeDisparityImage3(std::shared_ptr<void> stereo_handle,
         imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
         imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
         // return filtered_disp;
-        return std::shared_ptr<OccamImage>(filtered_disp_OI);
+        return std::shared_ptr<OccamImage>(filtered_disp_OI_copy, occamFreeImage);
     };  
     return DeferredImage(gen_fn,img0r,img1r);
 }
