@@ -203,6 +203,7 @@ void printHelp() {
   printf("  v: change OCCAM_BM_SPECKLE_WINDOW_SIZE\n");
   printf("  t: change OCCAM_FILTER_LAMBDA\n");
   printf("  g: change OCCAM_FILTER_SIGMA\n");
+  printf("  b: change OCCAM_FILTER_DDR\n");
 
   printf("  up/right: increase selected param\n");
   printf("  down/left: decrease selected param\n");
@@ -498,6 +499,12 @@ int main(int argc, const char** argv) {
       changing_param[0] = OCCAM_FILTER_SIGMA;
       changing_param[1] = (OccamParam)0;
       changing_param_name = stringify(OCCAM_FILTER_SIGMA);
+      printf("################### now changing %s ###################\n", changing_param_name.c_str());
+    }
+    else if (key == 'b') {
+      changing_param[0] = OCCAM_FILTER_DDR;
+      changing_param[1] = (OccamParam)0;
+      changing_param_name = stringify(OCCAM_FILTER_DDR);
       printf("################### now changing %s ###################\n", changing_param_name.c_str());
     }
 
