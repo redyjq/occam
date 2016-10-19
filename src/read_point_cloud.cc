@@ -552,14 +552,14 @@ int main(int argc, char **argv) {
     cropFilter.filter (*cloud); 
 
 
-    start = clock();
+    // start = clock();
     // Downsample the pointcloud
     pcl::VoxelGrid<PointT> vgf;
     vgf.setInputCloud (cloud);
     float leaf_size = 0.015f;
     vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
     vgf.filter (*cloud);
-    cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
+    // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
 
     // // Remove the ground using the given plane coefficients 
     // float plane_dist_thresh = 0.1;
