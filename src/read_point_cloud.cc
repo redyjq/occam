@@ -477,11 +477,11 @@ Mat getStitchedAndPointCloud(OccamDevice *device,
     // printf("Number of points converted to PCL: %d\n", numConverted);
 
     // Downsample the pointcloud
-    pcl::VoxelGrid<PointT> vgf;
-    vgf.setInputCloud (tempCloud);
-    float leaf_size = 0.10f;
-    vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
-    vgf.filter (*tempCloud);
+    // pcl::VoxelGrid<PointT> vgf;
+    // vgf.setInputCloud (tempCloud);
+    // float leaf_size = 0.01f;
+    // vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
+    // vgf.filter (*tempCloud);
 
     // combine extrisic transform and then apply to the cloud
     Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
@@ -552,13 +552,14 @@ int main(int argc, char **argv) {
     cropFilter.filter (*cloud); 
 
 
-    // start = clock();
+    start = clock();
     // Downsample the pointcloud
-    // pcl::VoxelGrid<PointT> vgf;
-    // vgf.setInputCloud (cloud);
-    // vgf.setLeafSize (0.05f, 0.05f, 0.05f);
-    // vgf.filter (*cloud);
-    // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
+    pcl::VoxelGrid<PointT> vgf;
+    vgf.setInputCloud (cloud);
+    float leaf_size = 0.015f;
+    vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
+    vgf.filter (*cloud);
+    cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
 
     // // Remove the ground using the given plane coefficients 
     // float plane_dist_thresh = 0.1;
@@ -582,15 +583,15 @@ int main(int argc, char **argv) {
     //ransacRemoveMultiple (cloud, plane_dist_thresh, 100, 500); 
 
     // Remove outliers to make point cloud cleaner
-    start = clock();
-    int outlier_num_points = 50;
-    float outlier_std_dev = 1.0;
-    pcl::StatisticalOutlierRemoval<PointT> sor;
-    sor.setInputCloud (cloud);
-    sor.setMeanK (outlier_num_points);
-    sor.setStddevMulThresh (outlier_std_dev);
-    sor.filter (*cloud);
-    cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " $$$$$$$$$$$$$$$$" << endl;
+    // start = clock();
+    // int outlier_num_points = 50;
+    // float outlier_std_dev = 1.0;
+    // pcl::StatisticalOutlierRemoval<PointT> sor;
+    // sor.setInputCloud (cloud);
+    // sor.setMeanK (outlier_num_points);
+    // sor.setStddevMulThresh (outlier_std_dev);
+    // sor.filter (*cloud);
+    // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " $$$$$$$$$$$$$$$$" << endl;
 
     // pcl::RadiusOutlierRemoval<PointT> outrem;
     // outrem.setInputCloud(cloud);
@@ -624,8 +625,8 @@ int main(int argc, char **argv) {
     pc_img_msg.img = *img_msg;
 
     // Publish all msgs
-    stitched_pub.publish(img_msg);
-    pc2_pub.publish(pc2);
+    // stitched_pub.publish(img_msg);
+    // pc2_pub.publish(pc2);
     pc2_and_stitched_pub.publish(pc_img_msg);
 
     ros::spinOnce();
