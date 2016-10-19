@@ -192,9 +192,29 @@ if(USE_OPENCV)
   add_executable(read_images_stereo_matcher examples/read_images_stereo_matcher.cc)
   target_link_libraries(read_images_stereo_matcher indigo ${OpenCV_LIBS_OPT})
 
+
   add_executable(read_images_periodic examples/read_images_periodic.cc)
   target_link_libraries(read_images_periodic indigo ${OpenCV_LIBS_OPT})
 
   add_executable(offline_stitch examples/offline_stitch.cc)
   target_link_libraries(offline_stitch indigo ${OpenCV_LIBS_OPT})
 endif()
+
+find_package(PCL 1.7 REQUIRED)
+include_directories(${PCL_INCLUDE_DIRS})
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
+target_link_libraries(read_images_stereo_matcher ${PCL_LIBRARIES})
+
+find_package(GLUT REQUIRED)
+include_directories(${GLUT_INCLUDE_DIRS})
+link_directories(${GLUT_LIBRARY_DIRS})
+add_definitions(${GLUT_DEFINITIONS})
+
+find_package(OpenGL REQUIRED)
+include_directories(${OpenGL_INCLUDE_DIRS})
+link_directories(${OpenGL_LIBRARY_DIRS})
+add_definitions(${OpenGL_DEFINITIONS})
+target_link_libraries(read_images_stereo_matcher ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
+
+
