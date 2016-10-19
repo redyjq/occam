@@ -544,7 +544,7 @@ int main(int argc, char **argv) {
     Eigen::Vector4f minP, maxP;
     float inf = std::numeric_limits<float>::infinity();
     minP[0] = -inf; minP[1] = -inf; minP[2] = 0;
-    maxP[0] = inf; maxP[1] = inf; maxP[2] = 1.6; 
+    maxP[0] = inf; maxP[1] = inf; maxP[2] = 1.4; 
     pcl::CropBox<PointT> cropFilter;
     cropFilter.setInputCloud (cloud);
     cropFilter.setMin(minP);
@@ -561,23 +561,23 @@ int main(int argc, char **argv) {
     vgf.filter (*cloud);
     // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
 
-    // // Remove the ground using the given plane coefficients 
-    // float plane_dist_thresh = 0.1;
-    // Eigen::Vector4f gc;   
-    // gc[0] = 0.0;
-    // gc[1] = 0.0;
-    // gc[2] = -1.0;
-    // gc[3] = -1.0;
-    // pcl::SampleConsensusModelPlane<PointT>::Ptr dit (new pcl::SampleConsensusModelPlane<PointT> (cloud));
-    // std::vector<int> ground_inliers;
-    // dit->selectWithinDistance (gc, plane_dist_thresh, ground_inliers);
-    // pcl::PointIndices::Ptr ground_ptr (new pcl::PointIndices);
-    // ground_ptr->indices = ground_inliers;   
-    // pcl::ExtractIndices<PointT> extract;
-    // extract.setInputCloud (cloud);  
-    // extract.setIndices (ground_ptr);  
-    // extract.setNegative (true);
-    // extract.filter (*cloud);
+    // Remove the ground using the given plane coefficients 
+    float plane_dist_thresh = 0.05;
+    Eigen::Vector4f gc;   
+    gc[0] = 0.0;
+    gc[1] = 0.0;
+    gc[2] = -1.0;
+    gc[3] = 0.0;
+    pcl::SampleConsensusModelPlane<PointT>::Ptr dit (new pcl::SampleConsensusModelPlane<PointT> (cloud));
+    std::vector<int> ground_inliers;
+    dit->selectWithinDistance (gc, plane_dist_thresh, ground_inliers);
+    pcl::PointIndices::Ptr ground_ptr (new pcl::PointIndices);
+    ground_ptr->indices = ground_inliers;   
+    pcl::ExtractIndices<PointT> extract;
+    extract.setInputCloud (cloud);  
+    extract.setIndices (ground_ptr);  
+    extract.setNegative (true);
+    extract.filter (*cloud);
         
     // Remove other planes such as walls
     //ransacRemoveMultiple (cloud, plane_dist_thresh, 100, 500); 
