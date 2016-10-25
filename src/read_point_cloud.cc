@@ -556,13 +556,13 @@ int main(int argc, char **argv) {
     // Downsample the pointcloud
     pcl::VoxelGrid<PointT> vgf;
     vgf.setInputCloud (cloud);
-    float leaf_size = 0.015f;
+    float leaf_size = 0.010f;
     vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
     vgf.filter (*cloud);
     // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
 
     // Remove the ground using the given plane coefficients 
-    float plane_dist_thresh = 0.05;
+    float plane_dist_thresh = 0.075;
     Eigen::Vector4f gc;   
     gc[0] = 0.0;
     gc[1] = 0.0;

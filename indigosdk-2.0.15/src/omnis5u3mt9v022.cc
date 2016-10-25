@@ -618,16 +618,16 @@ static DeferredImage computeDisparityImage(std::shared_ptr<void> stereo_handle,
     auto gen_fn = [=](){
         OccamImage* img0rp = img0r->get();
         OccamImage* img1rp = img1r->get();
-        Mat left_for_matcher = occamImageToCvMat(img0rp);
-        Mat right_for_matcher = occamImageToCvMat(img1rp);
         IOccamStereo* stereo_iface = 0;
         occamGetInterface(stereo_handle.get(),IOCCAMSTEREO,(void**)&stereo_iface);
         OccamImage* disp = 0;
         stereo_iface->compute(stereo_handle.get(),index,img0rp,img1rp,&disp);
-        Mat disp_cv = occamImageToCvMat(disp);
-        imwrite("img/disp/unfiltered/disp"+std::to_string(index)+".jpg", disp_cv);
-        imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
-        imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
+        // Mat disp_cv = occamImageToCvMat(disp);
+        // Mat left_for_matcher = occamImageToCvMat(img0rp);
+        // Mat right_for_matcher = occamImageToCvMat(img1rp);
+        // imwrite("img/disp/unfiltered/disp"+std::to_string(index)+".jpg", disp_cv);
+        // imwrite("img/mono/left_for_matcher"+std::to_string(index)+".jpg", left_for_matcher);
+        // imwrite("img/mono/right_for_matcher"+std::to_string(index)+".jpg", right_for_matcher);
 return std::shared_ptr<OccamImage>(disp,occamFreeImage);
     };  
     return DeferredImage(gen_fn,img0r,img1r);
@@ -1626,18 +1626,18 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         auto disp4 = computeDisparityImage(stereo_handle,4,img0_mon4r,img1_mon4r);
 
         // **************************** Stereo Params ****************************
-        int bm_prefilter_size = get_bm_prefilter_size();
-        int bm_prefilter_cap = get_bm_prefilter_cap();
-        int bm_sad_window_size = get_bm_sad_window_size();
-        int bm_min_disparity = get_bm_min_disparity();
-        int bm_num_disparities = get_bm_num_disparities();
-        int bm_texture_threshold = get_bm_texture_threshold();
-        int bm_uniqueness_ratio = get_bm_uniqueness_ratio();
-        int bm_speckle_range = get_bm_speckle_range();
-        int bm_speckle_window_size = get_bm_speckle_window_size();
-        int filter_lambda = get_filter_lambda();
-        int filter_sigma = get_filter_sigma();
-        int filter_ddr = get_filter_ddr();
+        // int bm_prefilter_size = get_bm_prefilter_size();
+        // int bm_prefilter_cap = get_bm_prefilter_cap();
+        // int bm_sad_window_size = get_bm_sad_window_size();
+        // int bm_min_disparity = get_bm_min_disparity();
+        // int bm_num_disparities = get_bm_num_disparities();
+        // int bm_texture_threshold = get_bm_texture_threshold();
+        // int bm_uniqueness_ratio = get_bm_uniqueness_ratio();
+        // int bm_speckle_range = get_bm_speckle_range();
+        // int bm_speckle_window_size = get_bm_speckle_window_size();
+        // int filter_lambda = get_filter_lambda();
+        // int filter_sigma = get_filter_sigma();
+        // int filter_ddr = get_filter_ddr();
         // *******************************************************************************
 
         // **************************** Disparity Filtering ****************************
