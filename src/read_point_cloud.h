@@ -19,7 +19,8 @@
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string>
+// #include <string>
+#include <string.h>
 #include <limits>
 #include "ros/ros.h"
 #include "nav_msgs/Odometry.h"

@@ -407,6 +407,24 @@ void **captureStitchedAndPointCloud(OccamDevice *device) {
   return data;
 }
 
+// void **captureRgbAndPointCloud(OccamDevice *device) {
+//   OccamDataName *req = (OccamDataName *)occamAlloc(10 * sizeof(OccamDataName));
+//   req[0] = OCCAM_IMAGE0;
+//   req[1] = OCCAM_IMAGE1;
+//   req[2] = OCCAM_IMAGE2;
+//   req[3] = OCCAM_IMAGE3;
+//   req[4] = OCCAM_IMAGE4;
+//   req[5] = OCCAM_POINT_CLOUD0;
+//   req[6] = OCCAM_POINT_CLOUD1;
+//   req[7] = OCCAM_POINT_CLOUD2;
+//   req[8] = OCCAM_POINT_CLOUD3;
+//   req[9] = OCCAM_POINT_CLOUD4;
+//   OccamDataType returnTypes[] = {OCCAM_IMAGE, OCCAM_POINT_CLOUD};
+//   void **data = (void **)occamAlloc(sizeof(void *) * 10);
+//   handleError(occamDeviceReadData(device, 10, req, returnTypes, data, 1));
+//   return data;
+// }
+
 void **captureRgbAndDisparity(OccamDevice *device) {
   int num_images = 10;
   OccamDataName *req =
@@ -457,11 +475,71 @@ void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI) {
   handleError(occamShutdown());
 }
 
+void getImgsAndPointCloud(OccamDevice *device, PointCloudT::Ptr pclPointCloud, Mat imgs[]) {
+  // void **data = captureRgbAndPointCloud(device);
+
+  OccamDataName *req_pc = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+  req_pc[0] = OCCAM_POINT_CLOUD0;
+  req_pc[1] = OCCAM_POINT_CLOUD1;
+  req_pc[2] = OCCAM_POINT_CLOUD2;
+  req_pc[3] = OCCAM_POINT_CLOUD3;
+  req_pc[4] = OCCAM_POINT_CLOUD4;
+  OccamDataType returnTypes_pc[] = {OCCAM_POINT_CLOUD};
+  void **data_pc;
+  int resp_pc = -1;
+  while(resp_pc != 0) {
+    data_pc = (void **)occamAlloc(sizeof(void *) * sensor_count);
+    resp_pc = occamDeviceReadData(device, sensor_count, req_pc, returnTypes_pc, data_pc, 1);
+    // printf("resp_pc: %d #########################\n", resp_pc);
+    // handleError(resp_pc);
+  }
+
+  OccamDataName *req_img = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+  req_img[0] = OCCAM_IMAGE0;
+  req_img[1] = OCCAM_IMAGE2;
+  req_img[2] = OCCAM_IMAGE4;
+  req_img[3] = OCCAM_IMAGE6;
+  req_img[4] = OCCAM_IMAGE8;
+  OccamDataType returnTypes_img[] = {OCCAM_IMAGE};
+  void **data_img;
+  int resp_img = -1;
+  while(resp_img != 0) {
+    data_img = (void **)occamAlloc(sizeof(void *) * sensor_count);
+    resp_img = occamDeviceReadData(device, sensor_count, req_img, returnTypes_img, data_img, 1);
+    // printf("resp_img: %d #########################\n", resp_img);
+  }
+
+  for (int i = 0; i < sensor_count; ++i) {
+    Mat img = occamImageToCvMat((OccamImage *)data_img[i]);
+    // printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
+    imgs[i] = img.clone();
+  }
+
+  // use latest odom data to transform the cloud with the movement of the robot
+  Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
+  for (int i = 0; i < sensor_count; ++i) {
+    OccamPointCloud *occamCloud = (OccamPointCloud *)data_pc[i];
+    // Convert to PCL point cloud
+    PointCloudT::Ptr tempCloud(new PointCloudT);
+    int numConverted = convertToPcl(occamCloud, tempCloud);
+    // combine extrisic transform and then apply to the cloud
+    Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
+    PointCloudT::Ptr transformedCloud (new PointCloudT);
+    pcl::transformPointCloud (*tempCloud, *transformedCloud, combined_transform);
+    // Add to large cloud
+    *pclPointCloud += *transformedCloud;
+  }
+  for (int i = 0; i < sensor_count; ++i) {
+    handleError(occamFreePointCloud((OccamPointCloud *)data_pc[i]));
+    handleError(occamFreeImage((OccamImage *)data_img[i]));
+  }
+}
+
 Mat getStitchedAndPointCloud(OccamDevice *device,
                               PointCloudT::Ptr pclPointCloud) {
   void **data = captureStitchedAndPointCloud(device);
   OccamImage *image = (OccamImage *)data[0];
-  Mat i = occamImageToCvMat(image);
+  Mat img = occamImageToCvMat(image);
   handleError(occamFreeImage(image));
 
   // use latest odom data to transform the cloud with the movement of the robot
@@ -495,7 +573,7 @@ Mat getStitchedAndPointCloud(OccamDevice *device,
     handleError(occamFreePointCloud((OccamPointCloud *)data[i+1]));
   }
   // printf("Number of points in large cloud: %zu\n", pclPointCloud->size());
-  return i;
+  return img;
 }
 
 int main(int argc, char **argv) {
@@ -535,7 +613,15 @@ int main(int argc, char **argv) {
     (*cloud).clear();
 
     ros::Time capture_time = ros::Time::now();
-    cvImage = getStitchedAndPointCloud(device, cloud);
+    // cvImage = getStitchedAndPointCloud(device, cloud);
+    Mat imgs[sensor_count];
+    getImgsAndPointCloud(device, cloud, imgs);
+    for (int i = 0; i < sensor_count; ++i) {
+      std::stringstream index;
+      index << i;
+      imwrite("img/rgb/rgb_0"+index.str()+".jpg", imgs[i]);
+    }
+
 
     printf("Cloud size before filtering: %zu\n", cloud->size());
     clock_t start;
