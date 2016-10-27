@@ -19,8 +19,7 @@
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
-// #include <string>
-#include <string.h>
+#include <string>
 #include <limits>
 #include "ros/ros.h"
 #include "nav_msgs/Odometry.h"
@@ -32,6 +31,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
 #include <image_transport/image_transport.h>
 #include <beam_joy/PointcloudAndImage.h>
 

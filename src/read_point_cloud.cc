@@ -115,11 +115,9 @@ void initSensorExtrisics(OccamDevice *device) {
   for (int i = 0; i < sensor_count; ++i) {
     // Get sensor extrisics
     double R[9];
-    handleError(occamGetDeviceValuerv(
-        device, OccamParam(OCCAM_SENSOR_ROTATION0 + i), R, 9));
+    handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_ROTATION0 + i), R, 9));
     double T[3];
-    handleError(occamGetDeviceValuerv(
-        device, OccamParam(OCCAM_SENSOR_TRANSLATION0 + i), T, 3));
+    handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_TRANSLATION0 + i), T, 3));
 
     // double K[9];
     // handleError(occamGetDeviceValuerv(
@@ -154,8 +152,8 @@ void initSensorExtrisics(OccamDevice *device) {
 
     extrisic_transforms[i] = transform;
 
-    // printf ("Transform for sensor %d:\n", i-1);
-    // std::cout << extrisic_transforms[i] << std::endl;
+    printf ("Transform for sensor %d:\n", i-1);
+    std::cout << extrisic_transforms[i] << std::endl;
   }
 }
 
@@ -188,6 +186,7 @@ Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
 
 Eigen::Matrix4f beam_occam_scale_transform;
 Eigen::Matrix4f odom_beam_transform;
+geometry_msgs::Pose odom_beam_pose;
 void initTransforms() {
   // scale the cloud from cm to m
   double scale = 0.01;
@@ -221,7 +220,8 @@ void initTransforms() {
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   // Update the matrix used to transform the pointcloud to the odom frame
-  odom_beam_transform = transform_from_pose(msg->pose.pose);  
+  odom_beam_pose = msg->pose.pose;
+  odom_beam_transform = transform_from_pose(odom_beam_pose);  
 }
 
 void occamCloudsToPCL(
@@ -475,7 +475,8 @@ void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI) {
   handleError(occamShutdown());
 }
 
-void getImgsAndPointCloud(OccamDevice *device, PointCloudT::Ptr pclPointCloud, Mat imgs[]) {
+void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, Mat imgs[], geometry_msgs::Pose *odom_beam_pose_out) {
+
   // void **data = captureRgbAndPointCloud(device);
 
   OccamDataName *req_pc = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
@@ -511,11 +512,12 @@ void getImgsAndPointCloud(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
 
   for (int i = 0; i < sensor_count; ++i) {
     Mat img = occamImageToCvMat((OccamImage *)data_img[i]);
-    // printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
+    printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
     imgs[i] = img.clone();
   }
 
   // use latest odom data to transform the cloud with the movement of the robot
+  *odom_beam_pose_out = odom_beam_pose;
   Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
     OccamPointCloud *occamCloud = (OccamPointCloud *)data_pc[i];
@@ -586,7 +588,7 @@ int main(int argc, char **argv) {
   // Subscribe to odometry data
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointCloud2 publisher
-  ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/occam/points", 1);
+  // ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/occam/points", 1);
   ros::Publisher pc2_and_stitched_pub = n.advertise<beam_joy::PointcloudAndImage>("/occam/points_and_stitched", 1);
 
   // image_transport::ImageTransport it(n);
@@ -615,11 +617,14 @@ int main(int argc, char **argv) {
     ros::Time capture_time = ros::Time::now();
     // cvImage = getStitchedAndPointCloud(device, cloud);
     Mat imgs[sensor_count];
-    getImgsAndPointCloud(device, cloud, imgs);
+    geometry_msgs::Pose odom_beam_pose_out;
+    getRGBPointCloudOdom(device, cloud, imgs, &odom_beam_pose_out);
+    // cout << odom_beam_pose_out << " $$$$$$$$$$$$$$$$" << endl;
+
     for (int i = 0; i < sensor_count; ++i) {
       std::stringstream index;
       index << i;
-      imwrite("img/rgb/rgb_0"+index.str()+".jpg", imgs[i]);
+      imwrite("img/rgb/rgb_"+index.str()+".jpg", imgs[i]);
     }
 
 
@@ -691,10 +696,24 @@ int main(int argc, char **argv) {
 
     printf("Cloud size after filtering: %zu\n", cloud->size());
 
+    // Init PointcloudAndImage msg
+    beam_joy::PointcloudAndImage pc_img_odom_msg;
+
+    // Add beam odom to msg
+    pc_img_odom_msg.odom = odom_beam_pose_out;
+
     // Convert cvImage to ROS Image msg
     sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", cvImage).toImageMsg();
     img_msg->header.frame_id = "occam_optical_link";
     img_msg->header.stamp = capture_time;
+    // pc_img_odom_msg.img = *img_msg;
+    
+    for (int i = 0; i < sensor_count; ++i) {
+      sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", imgs[i]).toImageMsg();
+      img_msg->header.frame_id = "occam_optical_link";
+      img_msg->header.stamp = capture_time;
+      pc_img_odom_msg.imgs.push_back(*img_msg);
+    }
 
     // Convert PCL pointcloud to ROS PointCloud2 msg
     sensor_msgs::PointCloud2 pc2;
@@ -704,16 +723,12 @@ int main(int argc, char **argv) {
     pcl_conversions::fromPCL(tmp_cloud, pc2);
     pc2.header.frame_id = "odom";
     pc2.header.stamp = capture_time;
-
-    // Init PointcloudAndImage msg
-    beam_joy::PointcloudAndImage pc_img_msg;
-    pc_img_msg.pc = pc2;
-    pc_img_msg.img = *img_msg;
+    pc_img_odom_msg.pc = pc2;
 
     // Publish all msgs
     // stitched_pub.publish(img_msg);
     // pc2_pub.publish(pc2);
-    pc2_and_stitched_pub.publish(pc_img_msg);
+    pc2_and_stitched_pub.publish(pc_img_odom_msg);
 
     ros::spinOnce();
 
