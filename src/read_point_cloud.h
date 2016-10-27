@@ -34,6 +34,8 @@
 #include <sensor_msgs/CameraInfo.h>
 #include <image_transport/image_transport.h>
 #include <beam_joy/PointcloudAndImage.h>
+#include <beam_joy/ConfigConfig.h>
+#include <dynamic_reconfigure/server.h>
 
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;

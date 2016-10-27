@@ -152,8 +152,8 @@ void initSensorExtrisics(OccamDevice *device) {
 
     extrisic_transforms[i] = transform;
 
-    printf ("Transform for sensor %d:\n", i-1);
-    std::cout << extrisic_transforms[i] << std::endl;
+    // printf ("Transform for sensor %d:\n", i-1);
+    // std::cout << extrisic_transforms[i] << std::endl;
   }
 }
 
@@ -512,7 +512,7 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
 
   for (int i = 0; i < sensor_count; ++i) {
     Mat img = occamImageToCvMat((OccamImage *)data_img[i]);
-    printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
+    // printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
     imgs[i] = img.clone();
   }
 
@@ -578,12 +578,26 @@ Mat getStitchedAndPointCloud(OccamDevice *device,
   return img;
 }
 
+void callback(beam_joy::ConfigConfig &config, uint32_t level) {
+  ROS_INFO("Reconfigure Request: %d %f %s %s %d", 
+            config.int_param, config.double_param, 
+            config.str_param.c_str(), 
+            config.bool_param?"True":"False", 
+            config.size);
+}
+
 int main(int argc, char **argv) {
 
   // Init ROS node
   ros::init(argc, argv, "beam_occam");
   ros::NodeHandle n;
   printf("Initialized ROS node.\n");
+
+  // Init dynamic reconfigure param server
+  dynamic_reconfigure::Server<beam_joy::ConfigConfig> server;
+  dynamic_reconfigure::Server<beam_joy::ConfigConfig>::CallbackType f;
+  f = boost::bind(&callback, _1, _2);
+  server.setCallback(f);
 
   // Subscribe to odometry data
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
@@ -624,7 +638,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < sensor_count; ++i) {
       std::stringstream index;
       index << i;
-      imwrite("img/rgb/rgb_"+index.str()+".jpg", imgs[i]);
+      imwrite("img/rgb/rgb"+index.str()+".jpg", imgs[i]);
     }
 
 

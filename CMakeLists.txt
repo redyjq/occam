@@ -46,12 +46,14 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   #cv_bridge
   beam_joy
+  dynamic_reconfigure
 )
 
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 target_link_libraries(occam ${catkin_LIBRARIES})
+add_dependencies(occam ${PROJECT_NAME}_gencfg)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cv_bridge)
 add_subdirectory(cv_bridge)
