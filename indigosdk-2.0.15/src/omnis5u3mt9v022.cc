@@ -1607,15 +1607,15 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         auto img1_mon3r = rectifyImage(rectify_handle,7,img1_mon3);
         auto img0_mon4r = rectifyImage(rectify_handle,8,img0_mon4);
         auto img1_mon4r = rectifyImage(rectify_handle,9,img1_mon4);
-        out.set(OCCAM_RECTIFIED_IMAGE0,img0_mon0r);
+        // out.set(OCCAM_RECTIFIED_IMAGE0,img0_mon0r);
         out.set(OCCAM_RECTIFIED_IMAGE1,img1_mon0r);
-        out.set(OCCAM_RECTIFIED_IMAGE2,img0_mon1r);
+        // out.set(OCCAM_RECTIFIED_IMAGE2,img0_mon1r);
         out.set(OCCAM_RECTIFIED_IMAGE3,img1_mon1r);
-        out.set(OCCAM_RECTIFIED_IMAGE4,img0_mon2r);
+        // out.set(OCCAM_RECTIFIED_IMAGE4,img0_mon2r);
         out.set(OCCAM_RECTIFIED_IMAGE5,img1_mon2r);
-        out.set(OCCAM_RECTIFIED_IMAGE6,img0_mon3r);
+        // out.set(OCCAM_RECTIFIED_IMAGE6,img0_mon3r);
         out.set(OCCAM_RECTIFIED_IMAGE7,img1_mon3r);
-        out.set(OCCAM_RECTIFIED_IMAGE8,img0_mon4r);
+        // out.set(OCCAM_RECTIFIED_IMAGE8,img0_mon4r);
         out.set(OCCAM_RECTIFIED_IMAGE9,img1_mon4r);
 
         std::shared_ptr<void> stereo_handle = module(OCCAM_STEREO_MATCHER0);
@@ -1674,6 +1674,11 @@ class OccamDevice_omnis5u3mt9v022 : public OccamMetaDeviceBase {
         auto img0_pro2r = rectifyImage(rectify_handle,4,img0_pro2);
         auto img0_pro3r = rectifyImage(rectify_handle,6,img0_pro3);
         auto img0_pro4r = rectifyImage(rectify_handle,8,img0_pro4);
+        out.set(OCCAM_RECTIFIED_IMAGE0,img0_pro0r);
+        out.set(OCCAM_RECTIFIED_IMAGE2,img0_pro1r);
+        out.set(OCCAM_RECTIFIED_IMAGE4,img0_pro2r);
+        out.set(OCCAM_RECTIFIED_IMAGE6,img0_pro3r);
+        out.set(OCCAM_RECTIFIED_IMAGE8,img0_pro4r);
 
         out.set(OCCAM_POINT_CLOUD0,computePointCloud(rectify_handle,0,img0_pro0r,disp0));
         out.set(OCCAM_POINT_CLOUD1,computePointCloud(rectify_handle,2,img0_pro1r,disp1));

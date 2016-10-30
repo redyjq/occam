@@ -52,6 +52,8 @@ find_package(catkin REQUIRED COMPONENTS
 include_directories(
   ${catkin_INCLUDE_DIRS}
 )
+
+generate_dynamic_reconfigure_options(cfg/Occam.cfg)
 target_link_libraries(occam ${catkin_LIBRARIES})
 add_dependencies(occam ${PROJECT_NAME}_gencfg)
 
@@ -59,5 +61,5 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cv_bridge)
 add_subdirectory(cv_bridge)
 target_link_libraries(occam cv_bridge)
 
-#set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
+#set(CMAKE_BUILD_TYPE Debug)

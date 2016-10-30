@@ -33,8 +33,8 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 #include <image_transport/image_transport.h>
-#include <beam_joy/PointcloudAndImage.h>
-#include <beam_joy/ConfigConfig.h>
+#include <beam_joy/PointcloudImagePose.h>
+#include <occam/OccamConfig.h>
 #include <dynamic_reconfigure/server.h>
 
 typedef pcl::PointXYZRGBA PointT;

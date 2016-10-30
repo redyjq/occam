@@ -119,17 +119,32 @@ void initSensorExtrisics(OccamDevice *device) {
     double T[3];
     handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_TRANSLATION0 + i), T, 3));
 
-    // double K[9];
-    // handleError(occamGetDeviceValuerv(
-    //     device, OccamParam(OCCAM_SENSOR_INTRINSICS0 + i), K, 9));
-    // printf("K:\n");
-    // for(int a=0; a<3; a++) {
-    //   for(int b=0; b<3; b++) {
-    //     printf("%f,\t", K[3*a+b]);
-    //   }
-    //   printf("\n");
-    // }
-    // printf("\n");
+    double K[9];
+    handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_INTRINSICS0 + i), K, 9));
+    double D[5];
+    handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_DISTORTION_COEFS0 + i), D, 5));
+
+    printf("#################################\n");
+    printf("{");
+    for(int d=0; d<5; d++)
+      printf("%f,", D[d]);
+    printf("},\n");
+    
+    printf("{");
+    for(int k=0; k<9; k++)
+      printf("%f,", K[k]);
+    printf("},\n");
+
+    printf("{");
+    for(int r=0; r<9; r++)
+      printf("%f,", R[r]);
+    printf("},\n");
+
+    printf("{");
+    for(int t=0; t<3; t++)
+      printf("%f,", T[t]);
+    printf("}\n");
+    printf("#################################\n");
 
     // Init transform
     Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
@@ -496,11 +511,16 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   }
 
   OccamDataName *req_img = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
-  req_img[0] = OCCAM_IMAGE0;
-  req_img[1] = OCCAM_IMAGE2;
-  req_img[2] = OCCAM_IMAGE4;
-  req_img[3] = OCCAM_IMAGE6;
-  req_img[4] = OCCAM_IMAGE8;
+  // req_img[0] = OCCAM_IMAGE0;
+  // req_img[1] = OCCAM_IMAGE2;
+  // req_img[2] = OCCAM_IMAGE4;
+  // req_img[3] = OCCAM_IMAGE6;
+  // req_img[4] = OCCAM_IMAGE8;
+  req_img[0] = OCCAM_RECTIFIED_IMAGE0;
+  req_img[1] = OCCAM_RECTIFIED_IMAGE2;
+  req_img[2] = OCCAM_RECTIFIED_IMAGE4;
+  req_img[3] = OCCAM_RECTIFIED_IMAGE6;
+  req_img[4] = OCCAM_RECTIFIED_IMAGE8;
   OccamDataType returnTypes_img[] = {OCCAM_IMAGE};
   void **data_img;
   int resp_img = -1;
@@ -513,6 +533,9 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   for (int i = 0; i < sensor_count; ++i) {
     Mat img = occamImageToCvMat((OccamImage *)data_img[i]);
     // printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
+    // rotate rectified img
+    flip(img.t(), img, 1);
+    flip(img, img, 1);
     imgs[i] = img.clone();
   }
 
@@ -578,12 +601,24 @@ Mat getStitchedAndPointCloud(OccamDevice *device,
   return img;
 }
 
-void callback(beam_joy::ConfigConfig &config, uint32_t level) {
-  ROS_INFO("Reconfigure Request: %d %f %s %s %d", 
-            config.int_param, config.double_param, 
-            config.str_param.c_str(), 
-            config.bool_param?"True":"False", 
-            config.size);
+void callback(occam::OccamConfig &config, uint32_t level) {
+  printf("Reconfigure Request:\n");
+  printf("OCCAM_PREFERRED_BACKEND: %d\n", config.OCCAM_PREFERRED_BACKEND);
+  printf("OCCAM_AUTO_EXPOSURE: %s\n", config.OCCAM_AUTO_EXPOSURE?"true":"false");
+  printf("OCCAM_AUTO_GAIN: %s\n", config.OCCAM_AUTO_GAIN?"true":"false");
+  printf("OCCAM_BM_PREFILTER_TYPE: %d\n", config.OCCAM_BM_PREFILTER_TYPE);
+  printf("OCCAM_BM_PREFILTER_SIZE: %d\n", config.OCCAM_BM_PREFILTER_SIZE);
+  printf("OCCAM_BM_PREFILTER_CAP: %d\n", config.OCCAM_BM_PREFILTER_CAP);
+  printf("OCCAM_BM_SAD_WINDOW_SIZE: %d\n", config.OCCAM_BM_SAD_WINDOW_SIZE);
+  printf("OCCAM_BM_MIN_DISPARITY: %d\n", config.OCCAM_BM_MIN_DISPARITY);
+  printf("OCCAM_BM_NUM_DISPARITIES: %d\n", config.OCCAM_BM_NUM_DISPARITIES);
+  printf("OCCAM_BM_TEXTURE_THRESHOLD: %d\n", config.OCCAM_BM_TEXTURE_THRESHOLD);
+  printf("OCCAM_BM_UNIQUENESS_RATIO: %d\n", config.OCCAM_BM_UNIQUENESS_RATIO);
+  printf("OCCAM_BM_SPECKLE_RANGE: %d\n", config.OCCAM_BM_SPECKLE_RANGE);
+  printf("OCCAM_BM_SPECKLE_WINDOW_SIZE: %d\n", config.OCCAM_BM_SPECKLE_WINDOW_SIZE);
+  printf("OCCAM_FILTER_LAMBDA: %d\n", config.OCCAM_FILTER_LAMBDA);
+  printf("OCCAM_FILTER_SIGMA: %d\n", config.OCCAM_FILTER_SIGMA);
+  printf("OCCAM_FILTER_DDR: %d\n", config.OCCAM_FILTER_DDR);
 }
 
 int main(int argc, char **argv) {
@@ -594,8 +629,8 @@ int main(int argc, char **argv) {
   printf("Initialized ROS node.\n");
 
   // Init dynamic reconfigure param server
-  dynamic_reconfigure::Server<beam_joy::ConfigConfig> server;
-  dynamic_reconfigure::Server<beam_joy::ConfigConfig>::CallbackType f;
+  dynamic_reconfigure::Server<occam::OccamConfig> server;
+  dynamic_reconfigure::Server<occam::OccamConfig>::CallbackType f;
   f = boost::bind(&callback, _1, _2);
   server.setCallback(f);
 
@@ -603,7 +638,7 @@ int main(int argc, char **argv) {
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointCloud2 publisher
   // ros::Publisher pc2_pub = n.advertise<sensor_msgs::PointCloud2>("/occam/points", 1);
-  ros::Publisher pc2_and_stitched_pub = n.advertise<beam_joy::PointcloudAndImage>("/occam/points_and_stitched", 1);
+  ros::Publisher pc2_and_stitched_pub = n.advertise<beam_joy::PointcloudImagePose>("/occam/points_rgb_odom", 1);
 
   // image_transport::ImageTransport it(n);
   // image_transport::Publisher pub = it.advertise("camera/image", 1);
@@ -661,7 +696,7 @@ int main(int argc, char **argv) {
     // Downsample the pointcloud
     pcl::VoxelGrid<PointT> vgf;
     vgf.setInputCloud (cloud);
-    float leaf_size = 0.010f;
+    float leaf_size = 0.015f;
     vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
     vgf.filter (*cloud);
     // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
@@ -710,8 +745,8 @@ int main(int argc, char **argv) {
 
     printf("Cloud size after filtering: %zu\n", cloud->size());
 
-    // Init PointcloudAndImage msg
-    beam_joy::PointcloudAndImage pc_img_odom_msg;
+    // Init PointcloudImagePose msg
+    beam_joy::PointcloudImagePose pc_img_odom_msg;
 
     // Add beam odom to msg
     pc_img_odom_msg.odom = odom_beam_pose_out;
