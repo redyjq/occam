@@ -1,6 +1,11 @@
 #include "read_point_cloud.h"
 
+#define stringify( name ) # name
+
 using namespace cv;
+
+OccamDevice* globalDevice = 0;
+int OCCAM_LEAF_SIZE = 10;
 
 void handleError(int returnCode) {
   if (returnCode != OCCAM_API_SUCCESS) {
@@ -511,16 +516,16 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   }
 
   OccamDataName *req_img = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
-  // req_img[0] = OCCAM_IMAGE0;
-  // req_img[1] = OCCAM_IMAGE2;
-  // req_img[2] = OCCAM_IMAGE4;
-  // req_img[3] = OCCAM_IMAGE6;
-  // req_img[4] = OCCAM_IMAGE8;
-  req_img[0] = OCCAM_RECTIFIED_IMAGE0;
-  req_img[1] = OCCAM_RECTIFIED_IMAGE2;
-  req_img[2] = OCCAM_RECTIFIED_IMAGE4;
-  req_img[3] = OCCAM_RECTIFIED_IMAGE6;
-  req_img[4] = OCCAM_RECTIFIED_IMAGE8;
+  req_img[0] = OCCAM_IMAGE0;
+  req_img[1] = OCCAM_IMAGE2;
+  req_img[2] = OCCAM_IMAGE4;
+  req_img[3] = OCCAM_IMAGE6;
+  req_img[4] = OCCAM_IMAGE8;
+  // req_img[0] = OCCAM_RECTIFIED_IMAGE0;
+  // req_img[1] = OCCAM_RECTIFIED_IMAGE2;
+  // req_img[2] = OCCAM_RECTIFIED_IMAGE4;
+  // req_img[3] = OCCAM_RECTIFIED_IMAGE6;
+  // req_img[4] = OCCAM_RECTIFIED_IMAGE8;
   OccamDataType returnTypes_img[] = {OCCAM_IMAGE};
   void **data_img;
   int resp_img = -1;
@@ -533,9 +538,9 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   for (int i = 0; i < sensor_count; ++i) {
     Mat img = occamImageToCvMat((OccamImage *)data_img[i]);
     // printf("image %d: r: %d c:%d\n", i, img.rows, img.cols);
-    // rotate rectified img
-    flip(img.t(), img, 1);
-    flip(img, img, 1);
+    // // rotate rectified img
+    // flip(img.t(), img, 1);
+    // flip(img, img, 1);
     imgs[i] = img.clone();
   }
 
@@ -601,24 +606,72 @@ Mat getStitchedAndPointCloud(OccamDevice *device,
   return img;
 }
 
-void callback(occam::OccamConfig &config, uint32_t level) {
-  printf("Reconfigure Request:\n");
+void changeParam(OccamParam param, std::string paramName, int newVal) {
+  if(!globalDevice)
+    return;
+  int value; occamGetDeviceValuei(globalDevice, param, &value);
+  if(value != newVal) {
+    occamSetDeviceValuei(globalDevice, param, newVal);
+    // int newvalue; occamGetDeviceValuei(globalDevice, param, &newvalue);
+    printf("################### %s changed to %d ###################\n", paramName.c_str(), newVal);
+  }
+}
+
+void config_callback(occam::OccamConfig &config, uint32_t level) {
+  // set all changed parameters
+  printf("Occam Reconfigure Request:\n");
+
+  printf("OCCAM_LEAF_SIZE: %d\n", config.OCCAM_LEAF_SIZE);
+  OCCAM_LEAF_SIZE = config.OCCAM_LEAF_SIZE;
+  printf("################### %s changed to %.4f ###################\n", "OCCAM_LEAF_SIZE", OCCAM_LEAF_SIZE*0.001);
   printf("OCCAM_PREFERRED_BACKEND: %d\n", config.OCCAM_PREFERRED_BACKEND);
+  changeParam(OCCAM_PREFERRED_BACKEND, "OCCAM_PREFERRED_BACKEND", config.OCCAM_PREFERRED_BACKEND);
+
   printf("OCCAM_AUTO_EXPOSURE: %s\n", config.OCCAM_AUTO_EXPOSURE?"true":"false");
+  changeParam(OCCAM_AUTO_EXPOSURE, "OCCAM_AUTO_EXPOSURE", config.OCCAM_AUTO_EXPOSURE);
+
   printf("OCCAM_AUTO_GAIN: %s\n", config.OCCAM_AUTO_GAIN?"true":"false");
+  changeParam(OCCAM_AUTO_GAIN, "OCCAM_AUTO_GAIN", config.OCCAM_AUTO_GAIN);
+
   printf("OCCAM_BM_PREFILTER_TYPE: %d\n", config.OCCAM_BM_PREFILTER_TYPE);
+  changeParam(OCCAM_BM_PREFILTER_TYPE, "OCCAM_BM_PREFILTER_TYPE", config.OCCAM_BM_PREFILTER_TYPE);
+
   printf("OCCAM_BM_PREFILTER_SIZE: %d\n", config.OCCAM_BM_PREFILTER_SIZE);
+  changeParam(OCCAM_BM_PREFILTER_SIZE, "OCCAM_BM_PREFILTER_SIZE", config.OCCAM_BM_PREFILTER_SIZE);
+
   printf("OCCAM_BM_PREFILTER_CAP: %d\n", config.OCCAM_BM_PREFILTER_CAP);
+  changeParam(OCCAM_BM_PREFILTER_CAP, "OCCAM_BM_PREFILTER_CAP", config.OCCAM_BM_PREFILTER_CAP);
+
   printf("OCCAM_BM_SAD_WINDOW_SIZE: %d\n", config.OCCAM_BM_SAD_WINDOW_SIZE);
+  changeParam(OCCAM_BM_SAD_WINDOW_SIZE, "OCCAM_BM_SAD_WINDOW_SIZE", config.OCCAM_BM_SAD_WINDOW_SIZE);
+
   printf("OCCAM_BM_MIN_DISPARITY: %d\n", config.OCCAM_BM_MIN_DISPARITY);
+  changeParam(OCCAM_BM_MIN_DISPARITY, "OCCAM_BM_MIN_DISPARITY", config.OCCAM_BM_MIN_DISPARITY);
+
   printf("OCCAM_BM_NUM_DISPARITIES: %d\n", config.OCCAM_BM_NUM_DISPARITIES);
+  changeParam(OCCAM_BM_NUM_DISPARITIES, "OCCAM_BM_NUM_DISPARITIES", config.OCCAM_BM_NUM_DISPARITIES);
+
   printf("OCCAM_BM_TEXTURE_THRESHOLD: %d\n", config.OCCAM_BM_TEXTURE_THRESHOLD);
+  changeParam(OCCAM_BM_TEXTURE_THRESHOLD, "OCCAM_BM_TEXTURE_THRESHOLD", config.OCCAM_BM_TEXTURE_THRESHOLD);
+
   printf("OCCAM_BM_UNIQUENESS_RATIO: %d\n", config.OCCAM_BM_UNIQUENESS_RATIO);
+  changeParam(OCCAM_BM_UNIQUENESS_RATIO, "OCCAM_BM_UNIQUENESS_RATIO", config.OCCAM_BM_UNIQUENESS_RATIO);
+
   printf("OCCAM_BM_SPECKLE_RANGE: %d\n", config.OCCAM_BM_SPECKLE_RANGE);
+  changeParam(OCCAM_BM_SPECKLE_RANGE, "OCCAM_BM_SPECKLE_RANGE", config.OCCAM_BM_SPECKLE_RANGE);
+
   printf("OCCAM_BM_SPECKLE_WINDOW_SIZE: %d\n", config.OCCAM_BM_SPECKLE_WINDOW_SIZE);
+  changeParam(OCCAM_BM_SPECKLE_WINDOW_SIZE, "OCCAM_BM_SPECKLE_WINDOW_SIZE", config.OCCAM_BM_SPECKLE_WINDOW_SIZE);
+
   printf("OCCAM_FILTER_LAMBDA: %d\n", config.OCCAM_FILTER_LAMBDA);
+  changeParam(OCCAM_FILTER_LAMBDA, "OCCAM_FILTER_LAMBDA", config.OCCAM_FILTER_LAMBDA);
+
   printf("OCCAM_FILTER_SIGMA: %d\n", config.OCCAM_FILTER_SIGMA);
+  changeParam(OCCAM_FILTER_SIGMA, "OCCAM_FILTER_SIGMA", config.OCCAM_FILTER_SIGMA);
+
   printf("OCCAM_FILTER_DDR: %d\n", config.OCCAM_FILTER_DDR);
+  changeParam(OCCAM_FILTER_DDR, "OCCAM_FILTER_DDR", config.OCCAM_FILTER_DDR);
+
 }
 
 int main(int argc, char **argv) {
@@ -631,7 +684,7 @@ int main(int argc, char **argv) {
   // Init dynamic reconfigure param server
   dynamic_reconfigure::Server<occam::OccamConfig> server;
   dynamic_reconfigure::Server<occam::OccamConfig>::CallbackType f;
-  f = boost::bind(&callback, _1, _2);
+  f = boost::bind(&config_callback, _1, _2);
   server.setCallback(f);
 
   // Subscribe to odometry data
@@ -646,6 +699,7 @@ int main(int argc, char **argv) {
 
   std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
+  globalDevice = device;
   OccamDeviceList *deviceList = occamAPI.second;  
 
   // Enable auto exposure and gain **important**
@@ -696,7 +750,7 @@ int main(int argc, char **argv) {
     // Downsample the pointcloud
     pcl::VoxelGrid<PointT> vgf;
     vgf.setInputCloud (cloud);
-    float leaf_size = 0.015f;
+    float leaf_size = OCCAM_LEAF_SIZE*0.001;
     vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
     vgf.filter (*cloud);
     // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
