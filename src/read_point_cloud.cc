@@ -1,11 +1,10 @@
 #include "read_point_cloud.h"
 
-#define stringify( name ) # name
-
 using namespace cv;
 
 OccamDevice* globalDevice = 0;
-int OCCAM_LEAF_SIZE = 10;
+float OCCAM_LEAF_SIZE = 0.010;
+float OCCAM_PLANE_DIST_THRESH = 0.075;
 
 void handleError(int returnCode) {
   if (returnCode != OCCAM_API_SUCCESS) {
@@ -621,9 +620,14 @@ void config_callback(occam::OccamConfig &config, uint32_t level) {
   // set all changed parameters
   printf("Occam Reconfigure Request:\n");
 
-  printf("OCCAM_LEAF_SIZE: %d\n", config.OCCAM_LEAF_SIZE);
+  printf("OCCAM_LEAF_SIZE: %.4f\n", config.OCCAM_LEAF_SIZE);
   OCCAM_LEAF_SIZE = config.OCCAM_LEAF_SIZE;
-  printf("################### %s changed to %.4f ###################\n", "OCCAM_LEAF_SIZE", OCCAM_LEAF_SIZE*0.001);
+  printf("################### %s changed to %.4f ###################\n", "OCCAM_LEAF_SIZE", OCCAM_LEAF_SIZE);
+  
+  printf("OCCAM_PLANE_DIST_THRESH: %.4f\n", config.OCCAM_PLANE_DIST_THRESH);
+  OCCAM_PLANE_DIST_THRESH = config.OCCAM_PLANE_DIST_THRESH;
+  printf("################### %s changed to %.4f ###################\n", "OCCAM_PLANE_DIST_THRESH", OCCAM_PLANE_DIST_THRESH);
+  
   printf("OCCAM_PREFERRED_BACKEND: %d\n", config.OCCAM_PREFERRED_BACKEND);
   changeParam(OCCAM_PREFERRED_BACKEND, "OCCAM_PREFERRED_BACKEND", config.OCCAM_PREFERRED_BACKEND);
 
@@ -750,13 +754,14 @@ int main(int argc, char **argv) {
     // Downsample the pointcloud
     pcl::VoxelGrid<PointT> vgf;
     vgf.setInputCloud (cloud);
-    float leaf_size = OCCAM_LEAF_SIZE*0.001;
+    float leaf_size = OCCAM_LEAF_SIZE;
     vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
     vgf.filter (*cloud);
     // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
 
     // Remove the ground using the given plane coefficients 
-    float plane_dist_thresh = 0.075;
+    // float plane_dist_thresh = 0.075;
+    float plane_dist_thresh = OCCAM_PLANE_DIST_THRESH;
     Eigen::Vector4f gc;   
     gc[0] = 0.0;
     gc[1] = 0.0;
