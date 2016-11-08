@@ -43,7 +43,3 @@ typedef pcl::PointCloud<PointT> PointCloudT;
 
 std::pair<OccamDevice *, OccamDeviceList *> initialize();
 void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI);
-cv::Mat getStitchedAndPointCloud(OccamDevice *device, PointCloudT::Ptr pc);
-void saveImage(OccamImage *image, std::string fileName);
-void saveImage(cv::Mat *image, std::string fileName);
-void **captureRgbAndDisparity(OccamDevice *device);
