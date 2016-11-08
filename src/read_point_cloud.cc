@@ -3,8 +3,7 @@
 using namespace cv;
 
 OccamDevice* globalDevice = 0;
-float OCCAM_LEAF_SIZE = 0.010;
-float OCCAM_PLANE_DIST_THRESH = 0.075;
+occam::OccamConfig config;
 
 void handleError(int returnCode) {
   if (returnCode != OCCAM_API_SUCCESS) {
@@ -113,9 +112,20 @@ void capturePointCloud(OccamDevice *device,
   handleError(occamFreePointCloud(pointCloud));
 }
 
+void printDblArr(double A[], int size, std::string prefix, std::string delimiter, std::string suffix) {
+    cout << prefix << std::scientific;
+    for(int a=0; a<size; a++)
+      if(a == size-1)
+        cout << A[a];
+      else
+        cout << A[a] << delimiter;
+    cout << suffix;
+}
+
 const int sensor_count = 5;
 Eigen::Matrix4f extrisic_transforms[sensor_count];
 void initSensorExtrisics(OccamDevice *device) {
+  printf("#################################\n");
   for (int i = 0; i < sensor_count; ++i) {
     // Get sensor extrisics
     double R[9];
@@ -128,27 +138,34 @@ void initSensorExtrisics(OccamDevice *device) {
     double D[5];
     handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_DISTORTION_COEFS0 + i), D, 5));
 
-    printf("#################################\n");
-    printf("{");
-    for(int d=0; d<5; d++)
-      printf("%f,", D[d]);
-    printf("},\n");
+    cout.precision(17);
+    cout << "{\n";
+    cout << "  752,\n";
+    cout << "  480,\n";
+    printDblArr(D, 5, "  {", ", ", "},\n");
+    printDblArr(K, 9, "  {", ", ", "},\n");
+    printDblArr(R, 9, "  {", ", ", "},\n");
+    printDblArr(T, 3, "  {", ", ", "}\n");
+    if(i == sensor_count-1)
+      cout << "}\n";
+    else
+      cout << "},\n";
     
-    printf("{");
-    for(int k=0; k<9; k++)
-      printf("%f,", K[k]);
-    printf("},\n");
+    // cout << "{" << std::scientific;
+    // for(int k=0; k<9; k++)
+    //   cout << K[k] << ",";
+    // cout << "}," << endl;
 
-    printf("{");
-    for(int r=0; r<9; r++)
-      printf("%f,", R[r]);
-    printf("},\n");
+    // cout << "{" << std::scientific;
+    // for(int r=0; r<9; r++)
+    //   cout << R[r] << ",";
+    //   printf("%f,", R[r]);
+    // printf("},\n");
 
-    printf("{");
-    for(int t=0; t<3; t++)
-      printf("%f,", T[t]);
-    printf("}\n");
-    printf("#################################\n");
+    // printf("{");
+    // for(int t=0; t<3; t++)
+    //   printf("%f,", T[t]);
+    // printf("}\n");
 
     // Init transform
     Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
@@ -174,6 +191,7 @@ void initSensorExtrisics(OccamDevice *device) {
     // printf ("Transform for sensor %d:\n", i-1);
     // std::cout << extrisic_transforms[i] << std::endl;
   }
+  printf("#################################\n");
 }
 
 Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
@@ -551,6 +569,21 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
     // Convert to PCL point cloud
     PointCloudT::Ptr tempCloud(new PointCloudT);
     int numConverted = convertToPcl(occamCloud, tempCloud);
+
+    if(config.filtering_enabled && config.crop_box_filter) {
+        // Crop out far away points
+        Eigen::Vector4f minP, maxP;
+        float inf = std::numeric_limits<float>::infinity();
+        minP[0] = -inf; minP[1] = -inf; minP[2] = 0.0;
+        maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_dist*100;
+        pcl::CropBox<PointT> cropFilter;
+        cropFilter.setInputCloud (tempCloud);
+        cropFilter.setMin(minP);
+        cropFilter.setMax(maxP);
+        cropFilter.setKeepOrganized(false);
+        cropFilter.filter (*tempCloud);
+    }
+
     // combine extrisic transform and then apply to the cloud
     Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
     PointCloudT::Ptr transformedCloud (new PointCloudT);
@@ -616,66 +649,26 @@ void changeParam(OccamParam param, std::string paramName, int newVal) {
   }
 }
 
-void config_callback(occam::OccamConfig &config, uint32_t level) {
+void config_callback(occam::OccamConfig &c, uint32_t level) {
   // set all changed parameters
-  printf("Occam Reconfigure Request:\n");
-
-  printf("OCCAM_LEAF_SIZE: %.4f\n", config.OCCAM_LEAF_SIZE);
-  OCCAM_LEAF_SIZE = config.OCCAM_LEAF_SIZE;
-  printf("################### %s changed to %.4f ###################\n", "OCCAM_LEAF_SIZE", OCCAM_LEAF_SIZE);
-  
-  printf("OCCAM_PLANE_DIST_THRESH: %.4f\n", config.OCCAM_PLANE_DIST_THRESH);
-  OCCAM_PLANE_DIST_THRESH = config.OCCAM_PLANE_DIST_THRESH;
-  printf("################### %s changed to %.4f ###################\n", "OCCAM_PLANE_DIST_THRESH", OCCAM_PLANE_DIST_THRESH);
-  
-  printf("OCCAM_PREFERRED_BACKEND: %d\n", config.OCCAM_PREFERRED_BACKEND);
-  changeParam(OCCAM_PREFERRED_BACKEND, "OCCAM_PREFERRED_BACKEND", config.OCCAM_PREFERRED_BACKEND);
-
-  printf("OCCAM_AUTO_EXPOSURE: %s\n", config.OCCAM_AUTO_EXPOSURE?"true":"false");
-  changeParam(OCCAM_AUTO_EXPOSURE, "OCCAM_AUTO_EXPOSURE", config.OCCAM_AUTO_EXPOSURE);
-
-  printf("OCCAM_AUTO_GAIN: %s\n", config.OCCAM_AUTO_GAIN?"true":"false");
-  changeParam(OCCAM_AUTO_GAIN, "OCCAM_AUTO_GAIN", config.OCCAM_AUTO_GAIN);
-
-  printf("OCCAM_BM_PREFILTER_TYPE: %d\n", config.OCCAM_BM_PREFILTER_TYPE);
-  changeParam(OCCAM_BM_PREFILTER_TYPE, "OCCAM_BM_PREFILTER_TYPE", config.OCCAM_BM_PREFILTER_TYPE);
-
-  printf("OCCAM_BM_PREFILTER_SIZE: %d\n", config.OCCAM_BM_PREFILTER_SIZE);
-  changeParam(OCCAM_BM_PREFILTER_SIZE, "OCCAM_BM_PREFILTER_SIZE", config.OCCAM_BM_PREFILTER_SIZE);
-
-  printf("OCCAM_BM_PREFILTER_CAP: %d\n", config.OCCAM_BM_PREFILTER_CAP);
-  changeParam(OCCAM_BM_PREFILTER_CAP, "OCCAM_BM_PREFILTER_CAP", config.OCCAM_BM_PREFILTER_CAP);
-
-  printf("OCCAM_BM_SAD_WINDOW_SIZE: %d\n", config.OCCAM_BM_SAD_WINDOW_SIZE);
-  changeParam(OCCAM_BM_SAD_WINDOW_SIZE, "OCCAM_BM_SAD_WINDOW_SIZE", config.OCCAM_BM_SAD_WINDOW_SIZE);
-
-  printf("OCCAM_BM_MIN_DISPARITY: %d\n", config.OCCAM_BM_MIN_DISPARITY);
-  changeParam(OCCAM_BM_MIN_DISPARITY, "OCCAM_BM_MIN_DISPARITY", config.OCCAM_BM_MIN_DISPARITY);
-
-  printf("OCCAM_BM_NUM_DISPARITIES: %d\n", config.OCCAM_BM_NUM_DISPARITIES);
-  changeParam(OCCAM_BM_NUM_DISPARITIES, "OCCAM_BM_NUM_DISPARITIES", config.OCCAM_BM_NUM_DISPARITIES);
-
-  printf("OCCAM_BM_TEXTURE_THRESHOLD: %d\n", config.OCCAM_BM_TEXTURE_THRESHOLD);
-  changeParam(OCCAM_BM_TEXTURE_THRESHOLD, "OCCAM_BM_TEXTURE_THRESHOLD", config.OCCAM_BM_TEXTURE_THRESHOLD);
-
-  printf("OCCAM_BM_UNIQUENESS_RATIO: %d\n", config.OCCAM_BM_UNIQUENESS_RATIO);
-  changeParam(OCCAM_BM_UNIQUENESS_RATIO, "OCCAM_BM_UNIQUENESS_RATIO", config.OCCAM_BM_UNIQUENESS_RATIO);
-
-  printf("OCCAM_BM_SPECKLE_RANGE: %d\n", config.OCCAM_BM_SPECKLE_RANGE);
-  changeParam(OCCAM_BM_SPECKLE_RANGE, "OCCAM_BM_SPECKLE_RANGE", config.OCCAM_BM_SPECKLE_RANGE);
-
-  printf("OCCAM_BM_SPECKLE_WINDOW_SIZE: %d\n", config.OCCAM_BM_SPECKLE_WINDOW_SIZE);
-  changeParam(OCCAM_BM_SPECKLE_WINDOW_SIZE, "OCCAM_BM_SPECKLE_WINDOW_SIZE", config.OCCAM_BM_SPECKLE_WINDOW_SIZE);
-
-  printf("OCCAM_FILTER_LAMBDA: %d\n", config.OCCAM_FILTER_LAMBDA);
-  changeParam(OCCAM_FILTER_LAMBDA, "OCCAM_FILTER_LAMBDA", config.OCCAM_FILTER_LAMBDA);
-
-  printf("OCCAM_FILTER_SIGMA: %d\n", config.OCCAM_FILTER_SIGMA);
-  changeParam(OCCAM_FILTER_SIGMA, "OCCAM_FILTER_SIGMA", config.OCCAM_FILTER_SIGMA);
-
-  printf("OCCAM_FILTER_DDR: %d\n", config.OCCAM_FILTER_DDR);
-  changeParam(OCCAM_FILTER_DDR, "OCCAM_FILTER_DDR", config.OCCAM_FILTER_DDR);
-
+  ROS_INFO("Occam Reconfigure Request");
+  config = c;
+  changeParam(OCCAM_PREFERRED_BACKEND, "OCCAM_PREFERRED_BACKEND", c.OCCAM_PREFERRED_BACKEND);
+  changeParam(OCCAM_AUTO_EXPOSURE, "OCCAM_AUTO_EXPOSURE", c.OCCAM_AUTO_EXPOSURE);
+  changeParam(OCCAM_AUTO_GAIN, "OCCAM_AUTO_GAIN", c.OCCAM_AUTO_GAIN);
+  changeParam(OCCAM_BM_PREFILTER_TYPE, "OCCAM_BM_PREFILTER_TYPE", c.OCCAM_BM_PREFILTER_TYPE);
+  changeParam(OCCAM_BM_PREFILTER_SIZE, "OCCAM_BM_PREFILTER_SIZE", c.OCCAM_BM_PREFILTER_SIZE);
+  changeParam(OCCAM_BM_PREFILTER_CAP, "OCCAM_BM_PREFILTER_CAP", c.OCCAM_BM_PREFILTER_CAP);
+  changeParam(OCCAM_BM_SAD_WINDOW_SIZE, "OCCAM_BM_SAD_WINDOW_SIZE", c.OCCAM_BM_SAD_WINDOW_SIZE);
+  changeParam(OCCAM_BM_MIN_DISPARITY, "OCCAM_BM_MIN_DISPARITY", c.OCCAM_BM_MIN_DISPARITY);
+  changeParam(OCCAM_BM_NUM_DISPARITIES, "OCCAM_BM_NUM_DISPARITIES", c.OCCAM_BM_NUM_DISPARITIES);
+  changeParam(OCCAM_BM_TEXTURE_THRESHOLD, "OCCAM_BM_TEXTURE_THRESHOLD", c.OCCAM_BM_TEXTURE_THRESHOLD);
+  changeParam(OCCAM_BM_UNIQUENESS_RATIO, "OCCAM_BM_UNIQUENESS_RATIO", c.OCCAM_BM_UNIQUENESS_RATIO);
+  changeParam(OCCAM_BM_SPECKLE_RANGE, "OCCAM_BM_SPECKLE_RANGE", c.OCCAM_BM_SPECKLE_RANGE);
+  changeParam(OCCAM_BM_SPECKLE_WINDOW_SIZE, "OCCAM_BM_SPECKLE_WINDOW_SIZE", c.OCCAM_BM_SPECKLE_WINDOW_SIZE);
+  changeParam(OCCAM_FILTER_LAMBDA, "OCCAM_FILTER_LAMBDA", c.OCCAM_FILTER_LAMBDA);
+  changeParam(OCCAM_FILTER_SIGMA, "OCCAM_FILTER_SIGMA", c.OCCAM_FILTER_SIGMA);
+  changeParam(OCCAM_FILTER_DDR, "OCCAM_FILTER_DDR", c.OCCAM_FILTER_DDR);
 }
 
 int main(int argc, char **argv) {
@@ -735,75 +728,81 @@ int main(int argc, char **argv) {
     }
 
 
-    printf("Cloud size before filtering: %zu\n", cloud->size());
+    printf("Cloud size: %lu\n", cloud->size());
     clock_t start;
+    if(config.filtering_enabled) {
+        if(config.crop_box_filter) {
+            // Crop out the floor and ceiling and points farther than dist
+            Eigen::Vector4f minP, maxP;
+            float inf = std::numeric_limits<float>::infinity();
+            minP[0] = -inf; minP[1] = -inf; minP[2] = config.min_z;
+            maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_z; 
+            pcl::CropBox<PointT> cropFilter;
+            cropFilter.setInputCloud (cloud);
+            cropFilter.setMin(minP);
+            cropFilter.setMax(maxP);
+            cropFilter.setKeepOrganized(false);
+            cropFilter.filter (*cloud);
+        }
 
-    // Crop out the floor and ceiling
-    Eigen::Vector4f minP, maxP;
-    float inf = std::numeric_limits<float>::infinity();
-    minP[0] = -inf; minP[1] = -inf; minP[2] = 0;
-    maxP[0] = inf; maxP[1] = inf; maxP[2] = 1.4; 
-    pcl::CropBox<PointT> cropFilter;
-    cropFilter.setInputCloud (cloud);
-    cropFilter.setMin(minP);
-    cropFilter.setMax(maxP);
-    cropFilter.filter (*cloud); 
+        if(config.voxel_grid_filter) {
+            // Downsample the pointcloud
+            pcl::VoxelGrid<PointT> vgf;
+            vgf.setInputCloud (cloud);
+            vgf.setLeafSize (config.leaf_size, config.leaf_size, config.leaf_size);
+            vgf.filter (*cloud);
+        }
 
+        if(config.plane_removal_filter) {
+            // Remove the ground using the given plane coefficients 
+            Eigen::Vector4f gc;   
+            gc[0] = 0.0;
+            gc[1] = 0.0;
+            gc[2] = -1.0;
+            gc[3] = 0.0;
+            pcl::SampleConsensusModelPlane<PointT>::Ptr dit (new pcl::SampleConsensusModelPlane<PointT> (cloud));
+            std::vector<int> ground_inliers;
+            dit->selectWithinDistance (gc, config.plane_dist_thresh, ground_inliers);
+            pcl::PointIndices::Ptr ground_ptr (new pcl::PointIndices);
+            ground_ptr->indices = ground_inliers;   
+            pcl::ExtractIndices<PointT> extract;
+            extract.setInputCloud (cloud);  
+            extract.setIndices (ground_ptr);  
+            extract.setNegative (true);
+            extract.setKeepOrganized(false);
+            extract.filter (*cloud);
+                
+            // Remove other planes such as walls
+            //ransacRemoveMultiple (cloud, config.plane_dist_thresh, 100, 500); 
+        }
+            
+        if(config.statistical_outlier_filter) {
+            // Remove statistical outliers to make point cloud cleaner
+            pcl::StatisticalOutlierRemoval<PointT> sor;
+            sor.setInputCloud (cloud);
+            sor.setMeanK (config.outlier_num_points);
+            sor.setStddevMulThresh (config.outlier_std_dev);
+            sor.setKeepOrganized(false);
+            sor.filter (*cloud);
+        }
+            
+        if(config.radius_outlier_filter) {
+            // Remove radius outliers to make point cloud cleaner
+            pcl::RadiusOutlierRemoval<PointT> outrem;
+            outrem.setInputCloud(cloud);
+            outrem.setRadiusSearch(config.radius_search);
+            outrem.setMinNeighborsInRadius(config.radius_neighbors);
+            outrem.setKeepOrganized(false);
+            outrem.filter (*cloud);
+        }
 
-    // start = clock();
-    // Downsample the pointcloud
-    pcl::VoxelGrid<PointT> vgf;
-    vgf.setInputCloud (cloud);
-    float leaf_size = OCCAM_LEAF_SIZE;
-    vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
-    vgf.filter (*cloud);
-    // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " ################" << endl;
+        // Remove NAN from cloud
+        std::vector<int> index;
+        pcl::removeNaNFromPointCloud(*cloud, *cloud, index);
 
-    // Remove the ground using the given plane coefficients 
-    // float plane_dist_thresh = 0.075;
-    float plane_dist_thresh = OCCAM_PLANE_DIST_THRESH;
-    Eigen::Vector4f gc;   
-    gc[0] = 0.0;
-    gc[1] = 0.0;
-    gc[2] = -1.0;
-    gc[3] = 0.0;
-    pcl::SampleConsensusModelPlane<PointT>::Ptr dit (new pcl::SampleConsensusModelPlane<PointT> (cloud));
-    std::vector<int> ground_inliers;
-    dit->selectWithinDistance (gc, plane_dist_thresh, ground_inliers);
-    pcl::PointIndices::Ptr ground_ptr (new pcl::PointIndices);
-    ground_ptr->indices = ground_inliers;   
-    pcl::ExtractIndices<PointT> extract;
-    extract.setInputCloud (cloud);  
-    extract.setIndices (ground_ptr);  
-    extract.setNegative (true);
-    extract.filter (*cloud);
+        printf("Cloud size after filtering: %lu\n", cloud->size());
+    }
         
-    // Remove other planes such as walls
-    //ransacRemoveMultiple (cloud, plane_dist_thresh, 100, 500); 
-
-    // Remove outliers to make point cloud cleaner
-    // start = clock();
-    // int outlier_num_points = 50;
-    // float outlier_std_dev = 1.0;
-    // pcl::StatisticalOutlierRemoval<PointT> sor;
-    // sor.setInputCloud (cloud);
-    // sor.setMeanK (outlier_num_points);
-    // sor.setStddevMulThresh (outlier_std_dev);
-    // sor.filter (*cloud);
-    // cout << (( clock() - start ) / (double) CLOCKS_PER_SEC) << " $$$$$$$$$$$$$$$$" << endl;
-
-    // pcl::RadiusOutlierRemoval<PointT> outrem;
-    // outrem.setInputCloud(cloud);
-    // outrem.setRadiusSearch(0.8);
-    // outrem.setMinNeighborsInRadius (2);
-    // outrem.filter (*cloud);
-    
-    // Remove NAN from cloud
-    std::vector<int> index;
-    pcl::removeNaNFromPointCloud(*cloud, *cloud, index);
-
-    printf("Cloud size after filtering: %zu\n", cloud->size());
-
     // Init PointcloudImagePose msg
     beam_joy::PointcloudImagePose pc_img_odom_msg;
 

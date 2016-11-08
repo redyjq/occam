@@ -37,6 +37,7 @@
 #include <occam/OccamConfig.h>
 #include <dynamic_reconfigure/server.h>
 
+typedef std::numeric_limits< double > dbl;
 typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 
