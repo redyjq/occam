@@ -252,20 +252,6 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   
   // void **data = captureRgbAndPointCloud(device);
 
-  OccamDataName *req_pc = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
-  req_pc[0] = OCCAM_POINT_CLOUD0;
-  req_pc[1] = OCCAM_POINT_CLOUD1;
-  req_pc[2] = OCCAM_POINT_CLOUD2;
-  req_pc[3] = OCCAM_POINT_CLOUD3;
-  req_pc[4] = OCCAM_POINT_CLOUD4;
-  OccamDataType returnTypes_pc[] = {OCCAM_POINT_CLOUD};
-  void **data_pc;
-  int resp_pc = -1;
-  while(resp_pc != 0) {
-    data_pc = (void **)occamAlloc(sizeof(void *) * sensor_count);
-    resp_pc = occamDeviceReadData(device, sensor_count, req_pc, returnTypes_pc, data_pc, 1);
-  }
-
   OccamDataName *req_img = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
   req_img[0] = OCCAM_IMAGE0;
   req_img[1] = OCCAM_IMAGE2;
@@ -278,6 +264,20 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   while(resp_img != 0) {
     data_img = (void **)occamAlloc(sizeof(void *) * sensor_count);
     resp_img = occamDeviceReadData(device, sensor_count, req_img, returnTypes_img, data_img, 1);
+  }
+
+  OccamDataName *req_pc = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
+  req_pc[0] = OCCAM_POINT_CLOUD0;
+  req_pc[1] = OCCAM_POINT_CLOUD1;
+  req_pc[2] = OCCAM_POINT_CLOUD2;
+  req_pc[3] = OCCAM_POINT_CLOUD3;
+  req_pc[4] = OCCAM_POINT_CLOUD4;
+  OccamDataType returnTypes_pc[] = {OCCAM_POINT_CLOUD};
+  void **data_pc;
+  int resp_pc = -1;
+  while(resp_pc != 0) {
+    data_pc = (void **)occamAlloc(sizeof(void *) * sensor_count);
+    resp_pc = occamDeviceReadData(device, sensor_count, req_pc, returnTypes_pc, data_pc, 1);
   }
 
   for (int i = 0; i < sensor_count; ++i) {

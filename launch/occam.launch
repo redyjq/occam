@@ -1,0 +1,8 @@
+<launch>
+	<!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find beam_joy)/rviz/occam.rviz"/> -->
+	<node name="rviz" pkg="rviz" type="rviz" args="-d $(find beam_joy)/rviz/tracker.rviz"/>
+
+	<node pkg="occam" type="separate_points_rgb_odom.py" name="separate_points_rgb_odom" output="log"/>
+	
+	<!-- <include file="$(find beam_joy)/launch/beam_joy.launch"/> -->
+</launch>
