@@ -167,11 +167,10 @@ Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
 
 void initTransforms() {
   // scale the cloud from cm to m
-  double scale = 0.01;
   Eigen::Matrix4f scale_transform = Eigen::Matrix4f::Identity();
-  scale_transform (0,0) = scale;
-  scale_transform (1,1) = scale;
-  scale_transform (2,2) = scale;
+  scale_transform (0,0) = config.scale;
+  scale_transform (1,1) = config.scale;
+  scale_transform (2,2) = config.scale;
 
   // use the transform from the beam robot base to the occam frame to orient the cloud
   geometry_msgs::Pose beam_occam_pose;
@@ -291,29 +290,37 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   for (int i = 0; i < sensor_count; ++i) {
     OccamPointCloud *occamCloud = (OccamPointCloud *)data_pc[i];
     // Convert to PCL point cloud
-    PointCloudT::Ptr tempCloud(new PointCloudT);
-    int numConverted = convertToPcl(occamCloud, tempCloud);
+    PointCloudT::Ptr sub_cloud(new PointCloudT);
+    int numConverted = convertToPcl(occamCloud, sub_cloud);
 
     if(config.filtering_enabled && config.crop_box_filter) {
-        // Crop out far away points
-        Eigen::Vector4f minP, maxP;
-        float inf = std::numeric_limits<float>::infinity();
-        minP[0] = -inf; minP[1] = -inf; minP[2] = 0.0;
-        maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_dist*100;
-        pcl::CropBox<PointT> cropFilter;
-        cropFilter.setInputCloud (tempCloud);
-        cropFilter.setMin(minP);
-        cropFilter.setMax(maxP);
-        cropFilter.setKeepOrganized(false);
-        cropFilter.filter (*tempCloud);
+      // Crop out far away points
+      Eigen::Vector4f minP, maxP;
+      float inf = std::numeric_limits<float>::infinity();
+      minP[0] = -inf; minP[1] = -inf; minP[2] = 0.0;
+      maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_dist / config.scale;
+      pcl::CropBox<PointT> cropFilter;
+      cropFilter.setInputCloud (sub_cloud);
+      cropFilter.setMin(minP);
+      cropFilter.setMax(maxP);
+      cropFilter.setKeepOrganized(false);
+      cropFilter.filter (*sub_cloud);
     }
+
+    // if(config.filtering_enabled && config.voxel_grid_filter) {
+    //   // Downsample the pointcloud
+    //   float leaf_size = config.leaf_size / config.scale;
+    //   pcl::VoxelGrid<PointT> vgf;
+    //   vgf.setInputCloud (sub_cloud);
+    //   vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
+    //   vgf.filter (*sub_cloud);
+    // }
 
     // combine extrisic transform and then apply to the cloud
     Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
-    PointCloudT::Ptr transformedCloud (new PointCloudT);
-    pcl::transformPointCloud (*tempCloud, *transformedCloud, combined_transform);
+    pcl::transformPointCloud (*sub_cloud, *sub_cloud, combined_transform);
     // Add to large cloud
-    *pclPointCloud += *transformedCloud;
+    *pclPointCloud += *sub_cloud;
   }
   for (int i = 0; i < sensor_count; ++i) {
     handleError(occamFreePointCloud((OccamPointCloud *)data_pc[i]));
@@ -336,6 +343,7 @@ void config_callback(occam::OccamConfig &c, uint32_t level) {
   // set all changed parameters
   ROS_INFO("Occam Reconfigure Request");
   config = c;
+
   changeParam(OCCAM_PREFERRED_BACKEND, "OCCAM_PREFERRED_BACKEND", c.OCCAM_PREFERRED_BACKEND);
   changeParam(OCCAM_AUTO_EXPOSURE, "OCCAM_AUTO_EXPOSURE", c.OCCAM_AUTO_EXPOSURE);
   changeParam(OCCAM_AUTO_GAIN, "OCCAM_AUTO_GAIN", c.OCCAM_AUTO_GAIN);
@@ -349,6 +357,8 @@ void config_callback(occam::OccamConfig &c, uint32_t level) {
   changeParam(OCCAM_BM_UNIQUENESS_RATIO, "OCCAM_BM_UNIQUENESS_RATIO", c.OCCAM_BM_UNIQUENESS_RATIO);
   changeParam(OCCAM_BM_SPECKLE_RANGE, "OCCAM_BM_SPECKLE_RANGE", c.OCCAM_BM_SPECKLE_RANGE);
   changeParam(OCCAM_BM_SPECKLE_WINDOW_SIZE, "OCCAM_BM_SPECKLE_WINDOW_SIZE", c.OCCAM_BM_SPECKLE_WINDOW_SIZE);
+
+  initTransforms();
 }
 
 int main(int argc, char **argv) {
@@ -378,12 +388,12 @@ int main(int argc, char **argv) {
   occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
   occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
 
-  PointCloudT::Ptr cloud(new PointCloudT);
-  PointCloudT::Ptr cloud_filtered(new PointCloudT);
   // initialize global constants
   initSensorExtrisics(device);
   initTransforms();
   
+  PointCloudT::Ptr cloud(new PointCloudT);
+
   while (ros::ok()) {
     (*cloud).clear();
 
