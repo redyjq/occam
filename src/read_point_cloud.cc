@@ -395,9 +395,9 @@ int main(int argc, char **argv) {
   while (ros::ok()) {
     (*cloud).clear();
 
-    ros::Time capture_time = ros::Time::now();
     Mat imgs[sensor_count];
     geometry_msgs::Pose odom_beam_pose_out;
+    ros::Time capture_time = ros::Time::now();
     getRGBPointCloudOdom(device, cloud, imgs, &odom_beam_pose_out);
 
     // for (int i = 0; i < sensor_count; ++i) {
