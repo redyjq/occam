@@ -179,10 +179,8 @@ void initTransforms() {
   beam_occam_pose.orientation.y = 0.5;
   beam_occam_pose.orientation.z = -0.5;
   beam_occam_pose.orientation.w = 0.5;
-  // beam_occam_pose.orientation.w = 1.0;
-  //beam_occam_pose.position.z = 1.658;  
-  beam_occam_pose.position.z = 1.10;  
-  beam_occam_pose.position.x = -0.140;  
+  beam_occam_pose.position.z = config.beam_occam_pos_z;  
+  beam_occam_pose.position.x = config.beam_occam_pos_x;  
   Eigen::Matrix4f beam_occam_transform = transform_from_pose(beam_occam_pose);
   // Eigen::Matrix4f beam_occam_transform = Eigen::Matrix4f::Identity();
 
