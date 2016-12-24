@@ -9,9 +9,9 @@ import dynamic_reconfigure.client
 # Author: Zach Zweig-Vinegar
 # This ROS Node converts combined msg into pointcloud and img msgs
 
-class SeparatePointsRgbOdom:
+class SeparatePointcloudImagePose:
 	def __init__(self):
-		rospy.init_node('SeparatePointsRgbOdom')
+		rospy.init_node('SeparatePointcloudImagePose')
 
 		rospy.Subscriber('/occam/points_rgb_odom', PointcloudImagePose, self.pc_rgb_odom_callback, queue_size=1)
 		self.img_pubs = []
@@ -54,4 +54,4 @@ class SeparatePointsRgbOdom:
 		# self.pc_num_points_pub.publish(float(pc_size))
 
 if __name__ == '__main__':
-	SeparatePointsRgbOdom()
+	SeparatePointcloudImagePose()
