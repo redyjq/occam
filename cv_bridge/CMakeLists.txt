@@ -14,14 +14,14 @@ find_package(Boost REQUIRED)
 endif()
 #find_package(OpenCV REQUIRED)
 
-catkin_package(
-  INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS rosconsole sensor_msgs
-  #DEPENDS OpenCV
-)
+# catkin_package(
+#   INCLUDE_DIRS include
+#   LIBRARIES ${PROJECT_NAME}
+#   CATKIN_DEPENDS rosconsole sensor_msgs
+#   #DEPENDS OpenCV
+# )
 
-catkin_python_setup()
+# catkin_python_setup()
 
 include_directories(SYSTEM ${Boost_INCLUDE_DIRS})
 include_directories(include ${catkin_INCLUDE_DIRS})

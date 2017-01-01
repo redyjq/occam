@@ -9,7 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   std_msgs
   image_transport
-  cv_bridge
+  # cv_bridge
   beam_joy
   dynamic_reconfigure
   pcl_ros
@@ -102,9 +102,9 @@ target_link_libraries(main indigo ${OpenCV_LIBS_OPT})
 target_link_libraries(main ${catkin_LIBRARIES})
 add_dependencies(main ${PROJECT_NAME}_gencfg)
 
-# include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cv_bridge)
-# add_subdirectory(cv_bridge)
-# target_link_libraries(main cv_bridge)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/cv_bridge)
+add_subdirectory(cv_bridge)
+target_link_libraries(main cv_bridge)
 
 set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_BUILD_TYPE Debug)
