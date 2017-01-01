@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 2.8)
 project(indigosdk)
 
-set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
-set(CMAKE_SWIG_OUTDIR "${CMAKE_BINARY_DIR}/bin")
-set(OpenCV_DIR "/home/rpal/opencv/build")
+# set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
+# set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
+# set(CMAKE_SWIG_OUTDIR "${CMAKE_BINARY_DIR}/bin")
+# set(OpenCV_DIR "/home/rpal/opencv/build")
 
 if (WIN32)
   set(MSVC_FLAGS "/FC /wd4018 /wd4996 /wd4200 /MP8")
@@ -76,8 +76,9 @@ option(DEVICE_TGMT9V02 "Build support for tgmt9v022" OFF)
 option(DEVICE_BU3AR0330 "Build support for bu3ar0330" OFF)
 
 if(USE_OPENCV)
-  include(FindOpenCV.cmake)
-  message("OpenCV include path: ${OpenCV2_INCLUDE_DIRS}")
+  find_package(OpenCV)
+  # include(FindOpenCV.cmake)
+  # message("OpenCV include path: ${OpenCV2_INCLUDE_DIRS}")
   include_directories(${OpenCV2_INCLUDE_DIRS} ${OpenCV_DIR})
 endif()
 

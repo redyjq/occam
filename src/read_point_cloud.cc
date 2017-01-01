@@ -1,5 +1,6 @@
 #include "read_point_cloud.h"
 
+using namespace std;
 using namespace cv;
 
 OccamDevice* globalDevice = 0;
@@ -38,7 +39,7 @@ int convertToPcl(OccamPointCloud *occamPointCloud, PointCloudT::Ptr pclPointClou
     // point->b, point->x, point->y, point->z);
 
     // double CULL_THRESHOLD = 1000;
-    // double inf = std::numeric_limits<double>::infinity();
+    // double inf = numeric_limits<double>::infinity();
     // if (point->x < inf && point->y < inf && point->z < inf) {
     //   double sqdist =
     //       point->x * point->x + point->y * point->y + point->z * point->z;
@@ -74,8 +75,8 @@ Mat occamImageToCvMat(OccamImage *image) {
   return colorImage;
 }
 
-void printDblArr(double A[], int size, std::string prefix, std::string delimiter, std::string suffix) {
-    cout << prefix << std::scientific;
+void printDblArr(double A[], int size, string prefix, string delimiter, string suffix) {
+    cout << prefix << scientific;
     for(int a=0; a<size; a++)
       if(a == size-1)
         cout << A[a];
@@ -133,7 +134,7 @@ void initSensorExtrisics(OccamDevice *device) {
     extrisic_transforms[i] = transform;
 
     // printf ("Transform for sensor %d:\n", i-1);
-    // std::cout << extrisic_transforms[i] << std::endl;
+    // cout << extrisic_transforms[i] << endl;
   }
   printf("#################################\n");
 }
@@ -199,7 +200,7 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
   odom_beam_transform = transform_from_pose(odom_beam_pose);  
 }
 
-std::pair<OccamDevice *, OccamDeviceList *> initializeOccamAPI() {
+pair<OccamDevice *, OccamDeviceList *> initializeOccamAPI() {
 
   // Initialize Occam SDK
   handleError(occamInitialize());
@@ -217,10 +218,10 @@ std::pair<OccamDevice *, OccamDeviceList *> initializeOccamAPI() {
   char *cid = deviceList->entries[0].cid;
   handleError(occamOpenDevice(cid, &device));
   printf("Opened device: %p\n", device);
-  return std::make_pair(device, deviceList);
+  return make_pair(device, deviceList);
 }
 
-void disposeOccamAPI(std::pair<OccamDevice *, OccamDeviceList *> occamAPI) {
+void disposeOccamAPI(pair<OccamDevice *, OccamDeviceList *> occamAPI) {
   // Clean up
   handleError(occamCloseDevice(occamAPI.first));
   handleError(occamFreeDeviceList(occamAPI.second));
@@ -294,7 +295,7 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
     if(config.filtering_enabled && config.crop_box_filter) {
       // Crop out far away points
       Eigen::Vector4f minP, maxP;
-      float inf = std::numeric_limits<float>::infinity();
+      float inf = numeric_limits<float>::infinity();
       minP[0] = -inf; minP[1] = -inf; minP[2] = 0.0;
       maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_dist / config.scale;
       pcl::CropBox<PointT> cropFilter;
@@ -326,7 +327,7 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   }
 }
 
-void changeParam(OccamParam param, std::string paramName, int newVal) {
+void changeParam(OccamParam param, string paramName, int newVal) {
   if(!globalDevice)
     return;
   int value; occamGetDeviceValuei(globalDevice, param, &value);
@@ -377,7 +378,7 @@ int main(int argc, char **argv) {
   // PointcloudImagePose publisher
   ros::Publisher pc_rgb_odom_pub = n.advertise<beam_joy::PointcloudImagePose>("/occam/points_rgb_odom", 1);
 
-  std::pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
+  pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
   globalDevice = device;
   OccamDeviceList *deviceList = occamAPI.second;  
@@ -401,7 +402,7 @@ int main(int argc, char **argv) {
     getRGBPointCloudOdom(device, cloud, imgs, &odom_beam_pose_out);
 
     // for (int i = 0; i < sensor_count; ++i) {
-    //   std::stringstream index;
+    //   stringstream index;
     //   index << i;
     //   imwrite("img/rgb/rgb"+index.str()+".jpg", imgs[i]);
     // }
@@ -412,7 +413,7 @@ int main(int argc, char **argv) {
         if(config.crop_box_filter) {
             // Crop out the floor and ceiling and points farther than dist
             Eigen::Vector4f minP, maxP;
-            float inf = std::numeric_limits<float>::infinity();
+            float inf = numeric_limits<float>::infinity();
             minP[0] = -inf; minP[1] = -inf; minP[2] = config.min_z;
             maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_z; 
             pcl::CropBox<PointT> cropFilter;
@@ -439,7 +440,7 @@ int main(int argc, char **argv) {
             gc[2] = -1.0;
             gc[3] = 0.0;
             pcl::SampleConsensusModelPlane<PointT>::Ptr dit (new pcl::SampleConsensusModelPlane<PointT> (cloud));
-            std::vector<int> ground_inliers;
+            vector<int> ground_inliers;
             dit->selectWithinDistance (gc, config.plane_dist_thresh, ground_inliers);
             pcl::PointIndices::Ptr ground_ptr (new pcl::PointIndices);
             ground_ptr->indices = ground_inliers;   
@@ -475,7 +476,7 @@ int main(int argc, char **argv) {
         }
 
         // Remove NAN from cloud
-        std::vector<int> index;
+        vector<int> index;
         pcl::removeNaNFromPointCloud(*cloud, *cloud, index);
 
         printf("Cloud size after filtering: %lu\n", cloud->size());
