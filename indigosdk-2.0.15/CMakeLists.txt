@@ -1,11 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 project(indigosdk)
 
-# set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
-# set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
-# set(CMAKE_SWIG_OUTDIR "${CMAKE_BINARY_DIR}/bin")
-# set(OpenCV_DIR "/home/rpal/opencv/build")
-
 if (WIN32)
   set(MSVC_FLAGS "/FC /wd4018 /wd4996 /wd4200 /MP8")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MSVC_FLAGS}")
@@ -77,8 +72,6 @@ option(DEVICE_BU3AR0330 "Build support for bu3ar0330" OFF)
 
 if(USE_OPENCV)
   find_package(OpenCV)
-  # include(FindOpenCV.cmake)
-  # message("OpenCV include path: ${OpenCV2_INCLUDE_DIRS}")
   include_directories(${OpenCV2_INCLUDE_DIRS} ${OpenCV_DIR})
 endif()
 
@@ -193,7 +186,6 @@ if(USE_OPENCV)
   add_executable(read_images_stereo_matcher examples/read_images_stereo_matcher.cc)
   target_link_libraries(read_images_stereo_matcher indigo ${OpenCV_LIBS_OPT})
 
-
   add_executable(read_images_periodic examples/read_images_periodic.cc)
   target_link_libraries(read_images_periodic indigo ${OpenCV_LIBS_OPT})
 
@@ -218,4 +210,4 @@ link_directories(${OpenGL_LIBRARY_DIRS})
 add_definitions(${OpenGL_DEFINITIONS})
 target_link_libraries(read_images_stereo_matcher ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
-
+set(CMAKE_BUILD_TYPE Release)

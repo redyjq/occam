@@ -3,6 +3,7 @@ import rospy
 from beam_joy.msg import *
 from geometry_msgs.msg import *
 from sensor_msgs.msg import *
+import sensor_msgs.point_cloud2 as pc2
 from std_msgs.msg import *
 import dynamic_reconfigure.client
 
@@ -49,9 +50,26 @@ class SeparatePointcloudImagePose:
 		for i in range(len(data.imgs)):
 			self.img_pubs[i].publish(data.imgs[i])
 		self.pc_pub.publish(data.pc)
+
+		# self.avg_point(data.pc)
 		# print "size(data.pc): %d" % (data.pc.width)
 		# pc_size = data.pc.width
 		# self.pc_num_points_pub.publish(float(pc_size))
+
+	def avg_point(self, pc):
+		xs, ys, zs, n = 0, 0, 0, 0
+		points = pc2.read_points(pc, field_names = ("x", "y", "z", "rgba"))
+		for p in points:
+			# print " x : %f  y: %f  z: %f" %(p[0],p[1],p[2])
+			xs += p[0]
+			ys += p[1]
+			zs += p[2]
+			n += 1
+		xs /= n
+		ys /= n
+		zs /= n
+		print "avg: (%.3f, %.3f, %.3f)" % (xs, ys, zs)
+
 
 if __name__ == '__main__':
 	SeparatePointcloudImagePose()
