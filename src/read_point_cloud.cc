@@ -35,19 +35,8 @@ int convertToPcl(OccamPointCloud *occamPointCloud, PointCloudT::Ptr pclPointClou
     point->y = occamPointCloud->xyz[i + 1];
     point->z = occamPointCloud->xyz[i + 2];
 
-    // printf("R: %d G: %d B: %d X: %f Y: %f Z: %f\n", point->r, point->g,
-    // point->b, point->x, point->y, point->z);
-
-    // double CULL_THRESHOLD = 1000;
-    // double inf = numeric_limits<double>::infinity();
-    // if (point->x < inf && point->y < inf && point->z < inf) {
-    //   double sqdist =
-    //       point->x * point->x + point->y * point->y + point->z * point->z;
-    //   if (sqrt(sqdist) < CULL_THRESHOLD) {
     pclPointCloud->push_back(*point);
     numPointsConverted++;
-    //   }
-    // }
   }
   pclPointCloud->is_dense = false;
   return numPointsConverted;
@@ -259,7 +248,7 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   OccamDataType returnTypes_img[] = {OCCAM_IMAGE};
   void **data_img;
   int resp_img = -1;
-  while(resp_img != 0) {
+  while(ros::ok() && resp_img != 0) {
     data_img = (void **)occamAlloc(sizeof(void *) * sensor_count);
     resp_img = occamDeviceReadData(device, sensor_count, req_img, returnTypes_img, data_img, 1);
   }
@@ -273,7 +262,7 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   OccamDataType returnTypes_pc[] = {OCCAM_POINT_CLOUD};
   void **data_pc;
   int resp_pc = -1;
-  while(resp_pc != 0) {
+  while(ros::ok() && resp_pc != 0) {
     data_pc = (void **)occamAlloc(sizeof(void *) * sensor_count);
     resp_pc = occamDeviceReadData(device, sensor_count, req_pc, returnTypes_pc, data_pc, 1);
   }
@@ -393,7 +382,10 @@ int main(int argc, char **argv) {
   
   PointCloudT::Ptr cloud(new PointCloudT);
 
+  int count = 0;
+  int num_iter = 20;
   while (ros::ok()) {
+    if(count++ > num_iter) { break; }
     (*cloud).clear();
 
     Mat imgs[sensor_count];
