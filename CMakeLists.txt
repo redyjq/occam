@@ -41,8 +41,8 @@ target_link_libraries(occam
   ${GPERFTOOLS_PROFILER}
 )
 
-# set(CMAKE_BUILD_TYPE Release)
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
+# set(CMAKE_BUILD_TYPE Debug)
 
 # gprof
 # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
