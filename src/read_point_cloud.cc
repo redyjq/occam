@@ -387,7 +387,7 @@ int main(int argc, char **argv) {
 
   int count = 0;
   int num_iter = 50;
-  ProfilerStart("occam_profile.log");
+  ProfilerStart("prof/profile.log");
   while (ros::ok()) {
     if(count++ > num_iter) { break; }
     (*cloud).clear();
