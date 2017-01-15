@@ -23,19 +23,22 @@ void handleError(int returnCode) {
 int convertToPcl(OccamPointCloud *occamPointCloud, PointCloudT::Ptr pclPointCloud) {
   int numPointsConverted = 0;
   int i;
-  for (i = 0; i < 3 * occamPointCloud->point_count; i += 3) {
-    PointT *point = new PointT();
+  PointT point = PointT();
+  uint8_t* rgb = occamPointCloud->rgb;
+  float* xyz = occamPointCloud->xyz;
+  int point_count = occamPointCloud->point_count;
+  for (i = 0; i < 3 * point_count; i += 3) {
 
-    point->r = occamPointCloud->rgb[i];
-    point->g = occamPointCloud->rgb[i + 1];
-    point->b = occamPointCloud->rgb[i + 2];
-    point->a = 255;
+    point.r = rgb[i];
+    point.g = rgb[i + 1];
+    point.b = rgb[i + 2];
+    point.a = 255;
 
-    point->x = occamPointCloud->xyz[i];
-    point->y = occamPointCloud->xyz[i + 1];
-    point->z = occamPointCloud->xyz[i + 2];
+    point.x = xyz[i];
+    point.y = xyz[i + 1];
+    point.z = xyz[i + 2];
 
-    pclPointCloud->push_back(*point);
+    pclPointCloud->push_back(point);
     numPointsConverted++;
   }
   pclPointCloud->is_dense = false;
@@ -383,7 +386,8 @@ int main(int argc, char **argv) {
   PointCloudT::Ptr cloud(new PointCloudT);
 
   int count = 0;
-  int num_iter = 20;
+  int num_iter = 50;
+  ProfilerStart("occam_profile.log");
   while (ros::ok()) {
     if(count++ > num_iter) { break; }
     (*cloud).clear();
@@ -502,6 +506,7 @@ int main(int argc, char **argv) {
     ros::spinOnce();
   }
 
+  ProfilerStop();
   disposeOccamAPI(occamAPI);
   return 0;
 }

@@ -57,6 +57,8 @@
   <run_depend>image_transport</run_depend>
   <run_depend>dynamic_reconfigure</run_depend>
 
+  <build_depend>gperftools_21</build_depend>
+  <run_depend>gperftools_21</run_depend>
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
