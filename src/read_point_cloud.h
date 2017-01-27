@@ -23,6 +23,7 @@
 #include <limits>
 #include "ros/ros.h"
 #include "nav_msgs/Odometry.h"
+#include "geometry_msgs/Twist.h"
 #include "sensor_msgs/PointCloud2.h"
 #include "std_msgs/Header.h"
 #include "tf/LinearMath/Matrix3x3.h"

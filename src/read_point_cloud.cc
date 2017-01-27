@@ -9,7 +9,13 @@ const int sensor_count = 5;
 Eigen::Matrix4f extrisic_transforms[sensor_count];
 Eigen::Matrix4f beam_occam_scale_transform;
 Eigen::Matrix4f odom_beam_transform;
-geometry_msgs::Pose odom_beam_pose;
+// geometry_msgs::Pose odom_beam_pose;
+std::deque<nav_msgs::Odometry> odom_msgs;
+nav_msgs::Odometry odom_msg;
+ros::Publisher pc_rgb_odom_pub, odom_req;
+pthread_mutex_t mutex;
+pthread_cond_t cond;
+bool condition = true;
 
 void handleError(int returnCode) {
   if (returnCode != OCCAM_API_SUCCESS) {
@@ -48,7 +54,6 @@ int convertToPcl(OccamPointCloud *occamPointCloud, PointCloudT::Ptr pclPointClou
 
 Mat occamImageToCvMat(OccamImage *image) {
   Mat *cvImage;
-  Mat colorImage;
   if (image && image->format == OCCAM_GRAY8) {
     cvImage = new Mat_<uchar>(image->height, image->width,
                                   (uchar *)image->data[0], image->step[0]);
@@ -56,7 +61,7 @@ Mat occamImageToCvMat(OccamImage *image) {
     cvImage =
         new Mat_<Vec3b>(image->height, image->width,
                                 (Vec3b *)image->data[0], image->step[0]);
-    cvtColor(*cvImage, colorImage, COLOR_BGR2RGB);
+    cvtColor(*cvImage, *cvImage, COLOR_BGR2RGB);
   } else if (image && image->format == OCCAM_SHORT1) {
     cvImage = new Mat_<short>(image->height, image->width,
                                   (short *)image->data[0], image->step[0]);
@@ -64,7 +69,7 @@ Mat occamImageToCvMat(OccamImage *image) {
     printf("Image type not supported: %d\n", image->format);
     cvImage = NULL;
   }
-  return colorImage;
+  return *cvImage;
 }
 
 void printDblArr(double A[], int size, string prefix, string delimiter, string suffix) {
@@ -186,10 +191,43 @@ void initTransforms() {
   printf("Initialized Transforms.\n");
 }
 
-void odomCallback(const nav_msgs::Odometry::ConstPtr& msg) {
+nav_msgs::Odometry getClosestOdom(ros::Time offset_time) {
+      nav_msgs::Odometry new_odom;
+      double min_diff = 10.0;
+      if(odom_msgs.empty())
+          new_odom.pose.pose.orientation.w = 1.0;
+
+      for (std::deque<nav_msgs::Odometry>::iterator it = odom_msgs.begin(); it != odom_msgs.end(); ++it) {
+          nav_msgs::Odometry odom = *it;
+          double diff = (offset_time - odom.header.stamp).toSec();
+          // printf("diff: %.2f\n", diff);
+          if(fabs(diff) < fabs(min_diff)) {
+              new_odom = odom;
+              min_diff = diff;
+          }
+      }
+
+      // if(fabs(min_diff) > 0.1)
+      //     ROS_WARN("min_diff is large: %.2f; couldn't find correctly timed odom", min_diff);
+
+      return new_odom;
+}
+
+void odomCallback(nav_msgs::Odometry msg) {
+  odom_msg = msg;
+  odom_msgs.push_back(msg);
+
+  while((int)odom_msgs.size() > config.odom_queue_size)
+      odom_msgs.pop_front();
+
+  pthread_mutex_lock(&mutex);
+  condition = true;
+  pthread_cond_signal(&cond);
+  pthread_mutex_unlock(&mutex);
+
+  // odom_beam_pose = msg.pose.pose;
   // Update the matrix used to transform the pointcloud to the odom frame
-  odom_beam_pose = msg->pose.pose;
-  odom_beam_transform = transform_from_pose(odom_beam_pose);  
+  // odom_beam_transform = transform_from_pose(odom_beam_pose);
 }
 
 pair<OccamDevice *, OccamDeviceList *> initializeOccamAPI() {
@@ -221,7 +259,8 @@ void disposeOccamAPI(pair<OccamDevice *, OccamDeviceList *> occamAPI) {
 }
 
 void **captureRgbAndPointCloud(OccamDevice *device) {
-  OccamDataName *req = (OccamDataName *)occamAlloc(10 * sizeof(OccamDataName));
+  int num_data = sensor_count * 2;
+  OccamDataName *req = (OccamDataName *)occamAlloc(num_data * sizeof(OccamDataName));
   req[0] = OCCAM_IMAGE0;
   req[1] = OCCAM_IMAGE1;
   req[2] = OCCAM_IMAGE2;
@@ -233,15 +272,23 @@ void **captureRgbAndPointCloud(OccamDevice *device) {
   req[8] = OCCAM_POINT_CLOUD3;
   req[9] = OCCAM_POINT_CLOUD4;
   OccamDataType returnTypes[] = {OCCAM_IMAGE, OCCAM_POINT_CLOUD};
-  void **data = (void **)occamAlloc(sizeof(void *) * 10);
-  handleError(occamDeviceReadData(device, 10, req, returnTypes, data, 1));
+  void **data = (void **)occamAlloc(sizeof(void *) * num_data);
+  handleError(occamDeviceReadData(device, num_data, req, returnTypes, data, 1));
   return data;
 }
 
 void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, Mat imgs[], geometry_msgs::Pose *odom_beam_pose_out) {
-  
-  // void **data = captureRgbAndPointCloud(device);
+  // request odom from the beam
+  geometry_msgs::Twist t;
+  condition = false;
+  odom_req.publish(t);
 
+  ros::Time pc_capture_time = ros::Time::now();
+  ros::Duration time_offset(config.odom_time_offset);
+  // calc new offset time
+  ros::Time offset_time = pc_capture_time + time_offset;
+
+  // void **data = captureRgbAndPointCloud(device);
   OccamDataName *req_img = (OccamDataName *)occamAlloc(sensor_count * sizeof(OccamDataName));
   req_img[0] = OCCAM_IMAGE0;
   req_img[1] = OCCAM_IMAGE2;
@@ -271,12 +318,30 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   }
 
   for (int i = 0; i < sensor_count; ++i) {
-    Mat img = occamImageToCvMat((OccamImage *)data_img[i]);
-    imgs[i] = img.clone();
+    imgs[i] = (occamImageToCvMat((OccamImage *)data_img[i])).clone();
   }
 
-  // use latest odom data to transform the cloud with the movement of the robot
+  pthread_mutex_lock(&mutex);
+  while (ros::ok() && !condition)
+    pthread_cond_wait(&cond, &mutex);
+
+  // nav_msgs::Odometry close_odom = odom_msg;
+
+  // match with the msg closest to the desired offset time
+  nav_msgs::Odometry close_odom = getClosestOdom(offset_time);
+  double time_diff = (offset_time - close_odom.header.stamp).toSec();
+  if(fabs(time_diff) > .05)
+    ROS_WARN("time_diff: %.2f", time_diff);
+  // else
+  //   ROS_INFO("time_diff: %.2f", time_diff);
+
+  // use correctly timed odom data to transform the cloud with the movement of the robot
+  geometry_msgs::Pose odom_beam_pose = close_odom.pose.pose;
+  odom_beam_transform = transform_from_pose(odom_beam_pose);
   *odom_beam_pose_out = odom_beam_pose;
+
+  pthread_mutex_unlock(&mutex);
+
   Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
     OccamPointCloud *occamCloud = (OccamPointCloud *)data_pc[i];
@@ -297,15 +362,6 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
       cropFilter.setKeepOrganized(false);
       cropFilter.filter (*sub_cloud);
     }
-
-    // if(config.filtering_enabled && config.voxel_grid_filter) {
-    //   // Downsample the pointcloud
-    //   float leaf_size = config.leaf_size / config.scale;
-    //   pcl::VoxelGrid<PointT> vgf;
-    //   vgf.setInputCloud (sub_cloud);
-    //   vgf.setLeafSize (leaf_size, leaf_size, leaf_size);
-    //   vgf.filter (*sub_cloud);
-    // }
 
     // combine extrisic transform and then apply to the cloud
     Eigen::Matrix4f combined_transform = odom_occam_transform * extrisic_transforms[i];
@@ -352,41 +408,11 @@ void config_callback(occam::OccamConfig &c, uint32_t level) {
   initTransforms();
 }
 
-int main(int argc, char **argv) {
-
-  // Init ROS node
-  ros::init(argc, argv, "beam_occam");
-  ros::NodeHandle n;
-  printf("Initialized ROS node.\n");
-
-  // Init dynamic reconfigure param server
-  dynamic_reconfigure::Server<occam::OccamConfig> server;
-  dynamic_reconfigure::Server<occam::OccamConfig>::CallbackType f;
-  f = boost::bind(&config_callback, _1, _2);
-  server.setCallback(f);
-
-  // Subscribe to odometry data
-  ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
-  // PointcloudImagePose publisher
-  ros::Publisher pc_rgb_odom_pub = n.advertise<beam_joy::PointcloudImagePose>("/occam/points_rgb_odom", 1);
-
-  pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
-  OccamDevice *device = occamAPI.first;
-  globalDevice = device;
-  OccamDeviceList *deviceList = occamAPI.second;  
-
-  // Enable auto exposure and gain **important**
-  occamSetDeviceValuei(device, OCCAM_AUTO_EXPOSURE, 1);
-  occamSetDeviceValuei(device, OCCAM_AUTO_GAIN, 1);
-
-  // initialize global constants
-  initSensorExtrisics(device);
-  initTransforms();
-  
+void capture() {
   PointCloudT::Ptr cloud(new PointCloudT);
 
-  int count = 0;
-  int num_iter = 50;
+  // int count = 0;
+  // int num_iter = 50;
   // ProfilerStart("prof/profile.log");
   while (ros::ok()) {
     // if(count++ > num_iter) { break; }
@@ -394,17 +420,11 @@ int main(int argc, char **argv) {
 
     Mat imgs[sensor_count];
     geometry_msgs::Pose odom_beam_pose_out;
-    ros::Time capture_time = ros::Time::now();
-    getRGBPointCloudOdom(device, cloud, imgs, &odom_beam_pose_out);
 
-    // for (int i = 0; i < sensor_count; ++i) {
-    //   stringstream index;
-    //   index << i;
-    //   imwrite("img/rgb/rgb"+index.str()+".jpg", imgs[i]);
-    // }
+    ros::Time capture_time = ros::Time::now();
+    getRGBPointCloudOdom(globalDevice, cloud, imgs, &odom_beam_pose_out);
 
     printf("Cloud size: %lu\n", cloud->size());
-    clock_t start;
     if(config.filtering_enabled) {
         if(config.crop_box_filter) {
             // Crop out the floor and ceiling and points farther than dist
@@ -505,8 +525,47 @@ int main(int argc, char **argv) {
 
     ros::spinOnce();
   }
+}
+
+int main(int argc, char **argv) {
+
+  // Init ROS node
+  ros::init(argc, argv, "beam_occam");
+  ros::NodeHandle n;
+  printf("Initialized ROS node.\n");
+
+  // Init dynamic reconfigure param server
+  dynamic_reconfigure::Server<occam::OccamConfig> server;
+  dynamic_reconfigure::Server<occam::OccamConfig>::CallbackType f;
+  f = boost::bind(&config_callback, _1, _2);
+  server.setCallback(f);
+
+  // Subscribe to odometry data
+  ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
+  // PointcloudImagePose publisher
+  pc_rgb_odom_pub = n.advertise<beam_joy::PointcloudImagePose>("/occam/points_rgb_odom", 1);
+  
+  odom_req = n.advertise<geometry_msgs::Twist>("/beam/publish_odom", 1);
+
+  pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
+  OccamDevice *device = occamAPI.first;
+  globalDevice = device;
+  OccamDeviceList *deviceList = occamAPI.second;  
+
+  // Enable auto exposure and gain **important**
+  occamSetDeviceValuei(globalDevice, OCCAM_AUTO_EXPOSURE, 1);
+  occamSetDeviceValuei(globalDevice, OCCAM_AUTO_GAIN, 1);
+
+  // initialize global constants
+  initSensorExtrisics(globalDevice);
+  initTransforms();
+
+  boost::thread captureThread = boost::thread(capture);
+  ros::spin();
 
   // ProfilerStop();
   disposeOccamAPI(occamAPI);
   return 0;
 }
+
+

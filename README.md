@@ -3,20 +3,74 @@ The controller code for the Occam Omni Stereo
 
 # Occam API Instructions
 
-##Usage
-###Setup
-* Clone the repo.
-* Run `cmake .` to construct the necessary makefiles
-* Run `make -j8` to build the code
+## Setup
+### Download
+ - Clone the repo into the `/src` folder of your ROS workspace
+`cd ~/ros_ws/src/`
+`git clone https://github.com/Cornell-RPAL/occam.git`
 
-### Recording mode
-* Run `./bin/occam`. This will construct combined point clouds from all of the sensors and stitched images and display the point clouds. The point clouds and corresponding stitched images are stored in `data/poincloudn.pcd` and `data/stitchedn.jpg`. The source code for this is in `src/read_point_cloud.cc`.
+### Dependencies
+ - Clone the other repos
+`git clone https://github.com/Cornell-RPAL/beam_joy.git`
+
+### Install
+ - Run `catkin_make -j8` to build
+	 - then `source ~/ros_ws/devel/setup.bash`
+
+## ROS API
+
+### Subscribed Topics
+ -  /beam/odom [nav_msgs/Odometry]
+
+### Published Topics
+ - /occam/points_rgb_odom [beam_joy/PointcloudImagePose]
+
+### Parameters
+
+ - auto_exposure (bool, default: True)
+	 - Image auto exposure value [False, True]
+
+## Usage
+
+### Connect to the Beam
+
+You can connect to Beam with an Ethernet cable. The network should be configured as `192.168.68.2/255.255.255.0`. Beam will be `192.168.68.1`.
+ - `export ROS_HOSTNAME=192.168.68.2 ROS_MASTER_URI=http://192.168.68.2:11311`
+ - `roscore`
+ - `ssh st@192.168.68.1 rosbeam-bridge.sh`, password is st.
+Now you will be able to see ROS topics from the beam like `/beam/odom` [nav_msgs/Odometry] and you should be able send movement commands on `/beam/cmd_vel` [geometry_msgs/Twist]
 
 ### Realtime operation
-* If you would like to read from the Occam without going through the disk, include the header in `src/read_point_cloud.h`.
-* Get a handle on the occam API with `std::pair<OccamDevice*, OccamDeviceList*> occamAPI = initializeOccamAPI();`.
-* Retrieve stitched images and point clouds with `getStitchedAndPointCloud(occamAPI.first, cloud, cvImage)`. See `main` in `src/read_pointcloud.cc` for examples of usage.
-* When done with the occam, call `disposeOcamAPI(occamAPI);`.
+  - Runs the occam node
+`rosrun occam occam`
+
+  - Runs RViz with the included config file to visualize the pointcloud and images:
+ `roslaunch occam viz.launch`
+ 
+  - Runs both the occam node and RViz with the included config file:
+`roslaunch occam occam.launch`
+
+### Joystick
+
+ - To enable teleoperation of the Beam with the Logitech controller, use the beam_joy package.
+`roslaunch beam_joy beam_joy.launch`
+
+### Recording
+
+ - You can create rosbags of the data coming from the occam for playback later. Use `rosbag record` and the topics you want to save.
+`rosbag record --duration=30 occam/points_rgb_odom`
+
+ - Playback the rosbag files with `rosbag play` and the name of the rosbag file
+`rosbag play -l -s 10 occam_2016-11-29-17-03-04.bag`
+
+ - More documentation on rosbags at http://wiki.ros.org/rosbag/Commandline
+
+### Extract Files
+If you would like to save PointcloudImagePose msgs as .pcd, .jpg, and .txt files:
+
+ - run the extraction script with `rosrun occam extract_points_rgb_odom.py`
+ - play the rosbag file with `rosbag play occam_2016-12-19-.bag` in a new terminal or use realtime data coming from the occam with `rosrun occam occam`
+ - the files will be extracted to the current directory
 
 ## Notes
 
@@ -27,38 +81,7 @@ If the point clouds are of poor quality (too sparse), tuning the `OCCAM_BM_UNIQU
 
 
 ###Examples
-If you would like to use the Occam in a different way, run `bin/read_images_opencv` (source file in `indigosdk-2.0.15/examples/read_images_opencv.cc`) and press 1 or 2 to browse the different options available. The other examples may also be useful. In order to record multiple types of data, say an OccamImage and an OccamPointCloud concurrently, for example, `indigosdk-2.0.15/examples/read_raw_images.cc` does this (also `src/read_pointcloud.cc`).
+If you would like to use the Occam in a different way, run `rosrun occam read_images_opencv` (source file in `indigosdk-2.0.15/examples/read_images_opencv.cc`) and press 1 or 2 to browse the different options available. The other examples may also be useful. In order to record multiple types of data, say an OccamImage and an OccamPointCloud concurrently, for example, `indigosdk-2.0.15/examples/read_raw_images.cc` does this (also `src/read_pointcloud.cc`).
 
 ###Issues
-If you run into issues working with the API, contact Daryl Sew (darylsew@gmail.com) and Xavier Delacour (xavier@occamvisiongroup.com), our Occam support contact.  
-
-# Database API Instructions
-Follow instructions [here](https://developers.google.com/drive/v3/web/quickstart/python#prerequisites) for turning on the Drive API. If that page is down, do the following.
-
-##Step 1: Turn on the Drive API
-
-1. Use [this wizard](https://console.developers.google.com/flows/enableapi?apiid=drive) to create or select a project in the Google Developers Console and automatically turn on the API. Click Continue, then Go to credentials.
-
-2. At the top of the page, select the OAuth consent screen tab. Select an Email address, enter a Product name if not already set, and click the Save button.
-
-3. Select the Credentials tab, click the Add credentials button and select OAuth 2.0 client ID.
-
-4. Select the application type Other, enter the name "Drive API Quickstart", and click the Create button.
-
-4. Click OK to dismiss the resulting dialog.
-
-5. Click the file_download (Download JSON) button to the right of the client ID.
-
-6. Move this file to your working directory and rename it client_secret.json.
-
-##Step 2: Install the Google Client Library
-
-Run the following command to install the library using pip:
-
-    pip install --upgrade google-api-python-client
-
-##Step 3: Run database code
-
-    python upload_daemon.py
-
-It might be useful to set this up as a cron job.
+If you run into issues working with the API, contact Zach Vinegar (zzv2@cornell.edu), Daryl Sew (darylsew@gmail.com) and Xavier Delacour (xavier@occamvisiongroup.com), our Occam support contact.  
