@@ -1,7 +1,6 @@
 # occam
+## Description
 The controller code for the Occam Omni Stereo
-
-# Occam API Instructions
 
 ## Setup
 ### Download
@@ -15,7 +14,7 @@ The controller code for the Occam Omni Stereo
 
 ### Install
  - Run `catkin_make -j8` to build
-	 - then `source ~/ros_ws/devel/setup.bash`
+ - then `source ~/ros_ws/devel/setup.bash`
 
 ## ROS API
 
@@ -36,10 +35,15 @@ The controller code for the Occam Omni Stereo
 
 You can connect to Beam with an Ethernet cable. The network should be configured as `192.168.68.2/255.255.255.0`. Beam will be `192.168.68.1`.
  - `export ROS_HOSTNAME=192.168.68.2 ROS_MASTER_URI=http://192.168.68.2:11311`
- - `roscore`
+ - `source ~/beam_profile.sh`
+ - `setbeamip`
  - `ssh st@192.168.68.1 rosbeam-bridge.sh`, password is st.
+ - `roscore`
 Now you will be able to see ROS topics from the beam like `/beam/odom` [nav_msgs/Odometry] and you should be able send movement commands on `/beam/cmd_vel` [geometry_msgs/Twist]
 
+To restart the rosbeam node:
+ - `ssh st@192.168.68.1`
+ - `pkill rosbeam-bridge && rosbeam-bridge.sh`
 ### Realtime operation
   - Runs the occam node
 `rosrun occam occam`
@@ -84,4 +88,4 @@ If the point clouds are of poor quality (too sparse), tuning the `OCCAM_BM_UNIQU
 If you would like to use the Occam in a different way, run `rosrun occam read_images_opencv` (source file in `indigosdk-2.0.15/examples/read_images_opencv.cc`) and press 1 or 2 to browse the different options available. The other examples may also be useful. In order to record multiple types of data, say an OccamImage and an OccamPointCloud concurrently, for example, `indigosdk-2.0.15/examples/read_raw_images.cc` does this (also `src/read_pointcloud.cc`).
 
 ###Issues
-If you run into issues working with the API, contact Zach Vinegar (zzv2@cornell.edu), Daryl Sew (darylsew@gmail.com) and Xavier Delacour (xavier@occamvisiongroup.com), our Occam support contact.  
+If you run into issues working with the API, contact Zach Vinegar (zzv2@cornell.edu), Daryl Sew (darylsew@gmail.com) or Xavier Delacour (xavier@occamvisiongroup.com), our Occam support contact.  

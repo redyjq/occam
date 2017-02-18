@@ -83,7 +83,7 @@ void printDblArr(double A[], int size, string prefix, string delimiter, string s
 }
 
 void initSensorExtrisics(OccamDevice *device) {
-  printf("#################################\n");
+  // printf("#################################\n");
   for (int i = 0; i < sensor_count; ++i) {
     // Get sensor extrisics
     double R[9];
@@ -96,18 +96,18 @@ void initSensorExtrisics(OccamDevice *device) {
     double D[5];
     handleError(occamGetDeviceValuerv(device, OccamParam(OCCAM_SENSOR_DISTORTION_COEFS0 + i), D, 5));
 
-    cout.precision(17);
-    cout << "{\n";
-    cout << "  752,\n";
-    cout << "  480,\n";
-    printDblArr(D, 5, "  {", ", ", "},\n");
-    printDblArr(K, 9, "  {", ", ", "},\n");
-    printDblArr(R, 9, "  {", ", ", "},\n");
-    printDblArr(T, 3, "  {", ", ", "}\n");
-    if(i == sensor_count-1)
-      cout << "}\n";
-    else
-      cout << "},\n";
+    // cout.precision(17);
+    // cout << "{\n";
+    // cout << "  752,\n";
+    // cout << "  480,\n";
+    // printDblArr(D, 5, "  {", ", ", "},\n");
+    // printDblArr(K, 9, "  {", ", ", "},\n");
+    // printDblArr(R, 9, "  {", ", ", "},\n");
+    // printDblArr(T, 3, "  {", ", ", "}\n");
+    // if(i == sensor_count-1)
+    //   cout << "}\n";
+    // else
+    //   cout << "},\n";
 
     // Init transform
     Eigen::Matrix4f transform = Eigen::Matrix4f::Identity();
@@ -133,7 +133,8 @@ void initSensorExtrisics(OccamDevice *device) {
     // printf ("Transform for sensor %d:\n", i-1);
     // cout << extrisic_transforms[i] << endl;
   }
-  printf("#################################\n");
+  // printf("#################################\n");
+  printf("Initialized Sensor Extrisics.\n");
 }
 
 Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
@@ -214,16 +215,20 @@ nav_msgs::Odometry getClosestOdom(ros::Time offset_time) {
 }
 
 void odomCallback(nav_msgs::Odometry msg) {
+  if(config.cond_wait)
+    pthread_mutex_lock(&mutex);
+
   odom_msg = msg;
   odom_msgs.push_back(msg);
 
   while((int)odom_msgs.size() > config.odom_queue_size)
       odom_msgs.pop_front();
 
-  pthread_mutex_lock(&mutex);
-  condition = true;
-  pthread_cond_signal(&cond);
-  pthread_mutex_unlock(&mutex);
+  if(config.cond_wait) {
+    condition = true;
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&mutex);
+  }
 
   // odom_beam_pose = msg.pose.pose;
   // Update the matrix used to transform the pointcloud to the odom frame
@@ -279,9 +284,8 @@ void **captureRgbAndPointCloud(OccamDevice *device) {
 
 void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, Mat imgs[], geometry_msgs::Pose *odom_beam_pose_out) {
   // request odom from the beam
-  geometry_msgs::Twist t;
   condition = false;
-  odom_req.publish(t);
+  odom_req.publish(std_msgs::Empty());
 
   ros::Time pc_capture_time = ros::Time::now();
   ros::Duration time_offset(config.odom_time_offset);
@@ -321,9 +325,32 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
     imgs[i] = (occamImageToCvMat((OccamImage *)data_img[i])).clone();
   }
 
-  pthread_mutex_lock(&mutex);
-  while (ros::ok() && !condition)
-    pthread_cond_wait(&cond, &mutex);
+  // int timeout = 500;
+  // struct timespec delta, abstime;
+  // delta.tv_sec = 0;
+  // // convert milliseconds to nanoseconds.
+  // delta.tv_nsec = timeout * 1000 * 1000 ;
+
+  // int status = pthread_get_expiration_np(&delta,&abstime);
+
+  // if (status == -1) {
+  //   ROS_ERROR("pthread_get_expiration_np() ");
+  // }
+
+  // pthread_mutex_lock(&mutex);
+
+  // while (ros::ok() && !condition) {
+  //   status = pthread_cond_timedwait(&cond, &mutex, &abstime);
+  //   if (status == -1) {
+  //     ROS_ERROR("TIMEOUT!\n");
+  //   }
+  // }
+
+  if(config.cond_wait) {
+    pthread_mutex_lock(&mutex);
+    while (ros::ok() && !condition)
+      pthread_cond_wait(&cond, &mutex);
+  }
 
   // nav_msgs::Odometry close_odom = odom_msg;
 
@@ -340,7 +367,8 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   odom_beam_transform = transform_from_pose(odom_beam_pose);
   *odom_beam_pose_out = odom_beam_pose;
 
-  pthread_mutex_unlock(&mutex);
+  if(config.cond_wait)
+    pthread_mutex_unlock(&mutex);
 
   Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
@@ -545,7 +573,7 @@ int main(int argc, char **argv) {
   // PointcloudImagePose publisher
   pc_rgb_odom_pub = n.advertise<beam_joy::PointcloudImagePose>("/occam/points_rgb_odom", 1);
   
-  odom_req = n.advertise<geometry_msgs::Twist>("/beam/publish_odom", 1);
+  odom_req = n.advertise<std_msgs::Empty>("/beam/publish_odom", 1);
 
   pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
