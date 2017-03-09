@@ -13,9 +13,9 @@ Eigen::Matrix4f odom_beam_transform;
 std::deque<nav_msgs::Odometry> odom_msgs;
 nav_msgs::Odometry odom_msg;
 ros::Publisher pc_rgb_odom_pub, odom_req;
-pthread_mutex_t mutex;
-pthread_cond_t cond;
-bool condition = true;
+// pthread_mutex_t mutex;
+// pthread_cond_t cond;
+// bool condition = true;
 
 void handleError(int returnCode) {
   if (returnCode != OCCAM_API_SUCCESS) {
@@ -215,8 +215,8 @@ nav_msgs::Odometry getClosestOdom(ros::Time offset_time) {
 }
 
 void odomCallback(nav_msgs::Odometry msg) {
-  if(config.cond_wait)
-    pthread_mutex_lock(&mutex);
+  // if(config.cond_wait)
+  //   pthread_mutex_lock(&mutex);
 
   odom_msg = msg;
   odom_msgs.push_back(msg);
@@ -224,11 +224,11 @@ void odomCallback(nav_msgs::Odometry msg) {
   while((int)odom_msgs.size() > config.odom_queue_size)
       odom_msgs.pop_front();
 
-  if(config.cond_wait) {
-    condition = true;
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&mutex);
-  }
+  // if(config.cond_wait) {
+  //   condition = true;
+  //   pthread_cond_signal(&cond);
+  //   pthread_mutex_unlock(&mutex);
+  // }
 
   // odom_beam_pose = msg.pose.pose;
   // Update the matrix used to transform the pointcloud to the odom frame
@@ -284,7 +284,7 @@ void **captureRgbAndPointCloud(OccamDevice *device) {
 
 void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, Mat imgs[], geometry_msgs::Pose *odom_beam_pose_out) {
   // request odom from the beam
-  condition = false;
+  // condition = false;
   odom_req.publish(std_msgs::Empty());
 
   ros::Time pc_capture_time = ros::Time::now();
@@ -346,11 +346,13 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   //   }
   // }
 
-  if(config.cond_wait) {
-    pthread_mutex_lock(&mutex);
-    while (ros::ok() && !condition)
-      pthread_cond_wait(&cond, &mutex);
-  }
+  // if(config.cond_wait) {
+  //   pthread_mutex_lock(&mutex);
+  //   while (ros::ok() && !condition)
+  //     pthread_cond_wait(&cond, &mutex);
+  // }
+
+  // TODO: sleep or wait for odom
 
   // nav_msgs::Odometry close_odom = odom_msg;
 
@@ -367,8 +369,8 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   odom_beam_transform = transform_from_pose(odom_beam_pose);
   *odom_beam_pose_out = odom_beam_pose;
 
-  if(config.cond_wait)
-    pthread_mutex_unlock(&mutex);
+  // if(config.cond_wait)
+  //   pthread_mutex_unlock(&mutex);
 
   Eigen::Matrix4f odom_occam_transform = odom_beam_transform * beam_occam_scale_transform;
   for (int i = 0; i < sensor_count; ++i) {
@@ -560,7 +562,7 @@ int main(int argc, char **argv) {
   // Init ROS node
   ros::init(argc, argv, "beam_occam");
   ros::NodeHandle n;
-  printf("Initialized ROS node.\n");
+  ROS_INFO("Initialized ROS node.");
 
   // Init dynamic reconfigure param server
   dynamic_reconfigure::Server<occam::OccamConfig> server;
@@ -575,10 +577,14 @@ int main(int argc, char **argv) {
   
   odom_req = n.advertise<std_msgs::Empty>("/beam/publish_odom", 1);
 
+  ROS_INFO("Initializing OCCAM");
+
   pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
   globalDevice = device;
   OccamDeviceList *deviceList = occamAPI.second;  
+
+  ROS_INFO("Setting up OCCAM");
 
   // Enable auto exposure and gain **important**
   occamSetDeviceValuei(globalDevice, OCCAM_AUTO_EXPOSURE, 1);
@@ -589,10 +595,12 @@ int main(int argc, char **argv) {
   initTransforms();
 
   boost::thread captureThread = boost::thread(capture);
+  ROS_INFO("Spinning up ROS");
   ros::spin();
 
   // ProfilerStop();
   disposeOccamAPI(occamAPI);
+
   return 0;
 }
 
