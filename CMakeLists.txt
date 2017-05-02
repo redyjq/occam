@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   cv_bridge
   gperftools_21
+  image_transport
 )
 
 generate_dynamic_reconfigure_options(cfg/Occam.cfg)
@@ -34,11 +35,35 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/indigosdk-2.0.15/include
 )
 
-target_link_libraries(occam 
+target_link_libraries(occam
   ${catkin_LIBRARIES}
   ${OpenCV_LIBS_OPT}
   indigo
   ${GPERFTOOLS_PROFILER}
+)
+
+add_executable(occam_stitched src/read_stitched.cc)
+
+target_link_libraries(occam_stitched
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS_OPT}
+  indigo
+  ${GPERFTOOLS_PROFILER}
+)
+
+add_executable(occam_raw src/publish_raw_images.cc)
+
+target_link_libraries(occam_raw
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBS_OPT}
+  indigo
+  ${GPERFTOOLS_PROFILER}
+)
+
+add_executable(odom_req src/odom_requester.cc)
+
+target_link_libraries(odom_req
+  ${catkin_LIBRARIES}
 )
 
 set(CMAKE_BUILD_TYPE Release)

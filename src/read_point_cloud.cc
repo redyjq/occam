@@ -12,7 +12,7 @@ Eigen::Matrix4f odom_beam_transform;
 // geometry_msgs::Pose odom_beam_pose;
 std::deque<nav_msgs::Odometry> odom_msgs;
 nav_msgs::Odometry odom_msg;
-ros::Publisher pc_rgb_odom_pub, odom_req;
+ros::Publisher pc_rgb_odom_pub, odom_req, pc_pub;
 // pthread_mutex_t mutex;
 // pthread_cond_t cond;
 // bool condition = true;
@@ -134,7 +134,7 @@ void initSensorExtrisics(OccamDevice *device) {
     // cout << extrisic_transforms[i] << endl;
   }
   // printf("#################################\n");
-  printf("Initialized Sensor Extrisics.\n");
+  ROS_INFO("Initialized Sensor Extrisics");
 }
 
 Eigen::Matrix4f transform_from_pose(geometry_msgs::Pose pose) {
@@ -178,8 +178,8 @@ void initTransforms() {
   beam_occam_pose.orientation.y = 0.5;
   beam_occam_pose.orientation.z = -0.5;
   beam_occam_pose.orientation.w = 0.5;
-  beam_occam_pose.position.z = config.beam_occam_pos_z;  
-  beam_occam_pose.position.x = config.beam_occam_pos_x;  
+  beam_occam_pose.position.z = config.beam_occam_pos_z;
+  beam_occam_pose.position.x = config.beam_occam_pos_x;
   Eigen::Matrix4f beam_occam_transform = transform_from_pose(beam_occam_pose);
   // Eigen::Matrix4f beam_occam_transform = Eigen::Matrix4f::Identity();
 
@@ -189,7 +189,7 @@ void initTransforms() {
   // if no odom recieved, assume identity transform
   odom_beam_transform = Eigen::Matrix4f::Identity();
 
-  printf("Initialized Transforms.\n");
+  ROS_INFO("Initialized Transforms");
 }
 
 nav_msgs::Odometry getClosestOdom(ros::Time offset_time) {
@@ -342,7 +342,7 @@ void getRGBPointCloudOdom(OccamDevice *device, PointCloudT::Ptr pclPointCloud, M
   // while (ros::ok() && !condition) {
   //   status = pthread_cond_timedwait(&cond, &mutex, &abstime);
   //   if (status == -1) {
-  //     ROS_ERROR("TIMEOUT!\n");
+  //     ROS_ERROR("TIMEOUT!");
   //   }
   // }
 
@@ -461,7 +461,7 @@ void capture() {
             Eigen::Vector4f minP, maxP;
             float inf = numeric_limits<float>::infinity();
             minP[0] = -inf; minP[1] = -inf; minP[2] = config.min_z;
-            maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_z; 
+            maxP[0] = inf; maxP[1] = inf; maxP[2] = config.max_z;
             pcl::CropBox<PointT> cropFilter;
             cropFilter.setInputCloud (cloud);
             cropFilter.setMin(minP);
@@ -479,8 +479,8 @@ void capture() {
         }
 
         if(config.plane_removal_filter) {
-            // Remove the ground using the given plane coefficients 
-            Eigen::Vector4f gc;   
+            // Remove the ground using the given plane coefficients
+            Eigen::Vector4f gc;
             gc[0] = 0.0;
             gc[1] = 0.0;
             gc[2] = -1.0;
@@ -489,18 +489,18 @@ void capture() {
             vector<int> ground_inliers;
             dit->selectWithinDistance (gc, config.plane_dist_thresh, ground_inliers);
             pcl::PointIndices::Ptr ground_ptr (new pcl::PointIndices);
-            ground_ptr->indices = ground_inliers;   
+            ground_ptr->indices = ground_inliers;
             pcl::ExtractIndices<PointT> extract;
-            extract.setInputCloud (cloud);  
-            extract.setIndices (ground_ptr);  
+            extract.setInputCloud (cloud);
+            extract.setIndices (ground_ptr);
             extract.setNegative (true);
             extract.setKeepOrganized(false);
             extract.filter (*cloud);
-                
+
             // Remove other planes such as walls
-            //ransacRemoveMultiple (cloud, config.plane_dist_thresh, 100, 500); 
+            //ransacRemoveMultiple (cloud, config.plane_dist_thresh, 100, 500);
         }
-            
+
         if(config.statistical_outlier_filter) {
             // Remove statistical outliers to make point cloud cleaner
             pcl::StatisticalOutlierRemoval<PointT> sor;
@@ -510,7 +510,7 @@ void capture() {
             sor.setKeepOrganized(false);
             sor.filter (*cloud);
         }
-            
+
         if(config.radius_outlier_filter) {
             // Remove radius outliers to make point cloud cleaner
             pcl::RadiusOutlierRemoval<PointT> outrem;
@@ -527,7 +527,7 @@ void capture() {
 
         printf("Cloud size after filtering: %lu\n", cloud->size());
     }
-        
+
     // Init PointcloudImagePose msg
     beam_joy::PointcloudImagePose pc_img_odom_msg;
 
@@ -549,6 +549,22 @@ void capture() {
     pc2.header.frame_id = "odom";
     pc2.header.stamp = capture_time;
     pc_img_odom_msg.pc = pc2;
+
+    if(config.occam_frame)
+    {
+      // get inverse odom transform and then apply to the cloud
+      Eigen::Matrix4f inv_odom_beam_transform = odom_beam_transform.inverse();
+      pcl::transformPointCloud (*cloud, *cloud, inv_odom_beam_transform);
+
+      sensor_msgs::PointCloud2 pc2_local;
+      pcl::PCLPointCloud2 tmp_cloud;
+      pcl::toPCLPointCloud2(*cloud, tmp_cloud);
+      pcl_conversions::fromPCL(tmp_cloud, pc2_local);
+      // Valts: I changed this to base_link because it looks like that's the correct frame
+      pc2_local.header.frame_id = "base_link";
+      pc2_local.header.stamp = capture_time;
+      pc_pub.publish(pc2_local);
+    }
 
     // Publish PointcloudImagePose
     pc_rgb_odom_pub.publish(pc_img_odom_msg);
@@ -574,7 +590,8 @@ int main(int argc, char **argv) {
   ros::Subscriber odom_sub = n.subscribe("/beam/odom", 1, odomCallback);
   // PointcloudImagePose publisher
   pc_rgb_odom_pub = n.advertise<beam_joy::PointcloudImagePose>("/occam/points_rgb_odom", 1);
-  
+  pc_pub = n.advertise<sensor_msgs::PointCloud2>("/occam/local_points", 1);
+
   odom_req = n.advertise<std_msgs::Empty>("/beam/publish_odom", 1);
 
   ROS_INFO("Initializing OCCAM");
@@ -582,7 +599,7 @@ int main(int argc, char **argv) {
   pair<OccamDevice *, OccamDeviceList *> occamAPI = initializeOccamAPI();
   OccamDevice *device = occamAPI.first;
   globalDevice = device;
-  OccamDeviceList *deviceList = occamAPI.second;  
+  OccamDeviceList *deviceList = occamAPI.second;
 
   ROS_INFO("Setting up OCCAM");
 
@@ -603,5 +620,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-
-
