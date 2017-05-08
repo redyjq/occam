@@ -85,14 +85,19 @@ int main(int argc, char** argv) {
 
   std::string base_topic = "/occam/rgb/rgb";
 
-  image_transport::Publisher publishers[sensor_count];
+  sensor_msgs::ImagePtr msgs [sensor_count];
+  //image_transport::Publisher publishers [sensor_count];
+  ros::Publisher publishers [sensor_count];
   for (j=0;j<sensor_count;j++)
   {
     std::ostringstream ss;
     ss << j;
-    std::string topic = base_topic + ss.str();
-    publishers[j] = it.advertise(topic, 1);
+    std::string topic = base_topic + ss.str() + "_local";
+    //publishers[j] = it.advertise(topic, 1);
+    publishers[j] = n.advertise <sensor_msgs::Image>(topic, 1);
   }
+
+  printf("Publishing images...");
 
   ros::Rate rate(10);
   while (ros::ok())
@@ -100,51 +105,42 @@ int main(int argc, char** argv) {
     if ((r = occamDeviceReadData(device, sensor_count, req, 0, (void**)images, 1)) != OCCAM_API_SUCCESS)
       reportError(r);
 
+    ros::Time stamp = ros::Time::now();
+
     for (j=0;j<sensor_count;++j)
     {
-       printf("read image %i.%i: time_ns = %llu, index = %i, format = %i, width = %i, height = %i\n",
+       /*printf("read image %i.%i: time_ns = %llu, index = %i, format = %i, width = %i, height = %i\n",
 	     i, j, (long long unsigned int)images[j]->time_ns, images[j]->index,
-	     images[j]->format, images[j]->width, images[j]->height);
+	     images[j]->format, images[j]->width, images[j]->height);*/
 
        /*Convert to opencv/ROS and publish via imagetransport*/
        cv::Mat img;
        if (images[j] && images[j]->format == OCCAM_GRAY8)
        {
-          printf("gray image");
           img = cv::Mat_<uchar>(images[j]->height,images[j]->width,(uchar*)images[j]->data[0],images[j]->step[0]);
        }
        else if (images[j] && images[j]->format == OCCAM_RGB24) {
           img = cv::Mat_<cv::Vec3b>(images[j]->height,images[j]->width,(cv::Vec3b*)images[j]->data[0],images[j]->step[0]);
           cv::Mat img1;
           cv::cvtColor(img, img1, cv::COLOR_BGR2RGB);
+          img.release ();
           img = img1;
        } else if (images[j] && images[j]->format == OCCAM_SHORT1) {
           img = cv::Mat_<short>(images[j]->height,images[j]->width,(short*)images[j]->data[0],images[j]->step[0]);
        } else {
           printf("image format not supported \n");
        }
+       occamFreeImage(images[j]);
 
        std_msgs::Header header = std_msgs::Header();
-       header.stamp = ros::Time::now();
+       header.stamp = stamp;
        header.frame_id = "/occam_optical_link";
-
-       sensor_msgs::ImagePtr msg = cv_bridge::CvImage(header, "bgr8", img).toImageMsg();
+       cv_bridge::CvImage cv_image = cv_bridge::CvImage(header, "bgr8", img);
+       img.release ();
+       sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
        publishers[j].publish (msg);
-
-       /*if (!img.empty())
-       {
-         imshow("indigosdk", img);
-         cv::waitKey(10);
-       }
-       else
-       {
-         printf("EMPTY IMAGE");
-       }*/
     }
 
-    for (j=0;j<sensor_count;++j) {
-      occamFreeImage(images[j]);
-    }
     ros::spinOnce();
     rate.sleep();
   }

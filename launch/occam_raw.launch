@@ -1,4 +1,3 @@
 <launch>
 	<node pkg="occam" type="occam_raw" name="occam_raw" output="screen"/>
-	<node pkg="occam" type="odom_req" name="odom_req" output="screen"/>
 </launch>
