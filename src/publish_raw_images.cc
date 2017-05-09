@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
 
   std::string base_topic = "/occam/rgb/rgb";
 
-  sensor_msgs::ImagePtr msgs [sensor_count];
+  //sensor_msgs::ImagePtr msgs [sensor_count];
   //image_transport::Publisher publishers [sensor_count];
   ros::Publisher publishers [sensor_count];
   for (j=0;j<sensor_count;j++)
@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 
   printf("Publishing images...");
 
-  ros::Rate rate(10);
+  ros::Rate rate(20);
   while (ros::ok())
   {
     if ((r = occamDeviceReadData(device, sensor_count, req, 0, (void**)images, 1)) != OCCAM_API_SUCCESS)
@@ -130,15 +130,27 @@ int main(int argc, char** argv) {
        } else {
           printf("image format not supported \n");
        }
-       occamFreeImage(images[j]);
+       //occamFreeImage(images[j]);
 
        std_msgs::Header header = std_msgs::Header();
        header.stamp = stamp;
        header.frame_id = "/occam_optical_link";
+
+       // This seems wasteful but if the image that's initialized in occam SDK is
+       // published via image_transport publisher, it never gets released
+       //cv::Mat img_out = img.clone();
+       //img.release();
        cv_bridge::CvImage cv_image = cv_bridge::CvImage(header, "bgr8", img);
-       img.release ();
        sensor_msgs::ImagePtr msg = cv_image.toImageMsg();
        publishers[j].publish (msg);
+       //img_out.release();
+
+
+    }
+
+    for (j=0;j<sensor_count;++j)
+    {
+      occamFreeImage(images[j]);
     }
 
     ros::spinOnce();
