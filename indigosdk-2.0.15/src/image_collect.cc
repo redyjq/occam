@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #undef min
 #undef max
 
-#define DEBUG_SYNC
+//#define DEBUG_SYNC
 
 ////////////////////////////////////////////////////////////////////////
 // ImageCollector

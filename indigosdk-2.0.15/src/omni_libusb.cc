@@ -41,7 +41,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #undef max
 
 //#define DEBUG_DATA_RATES
-#define DEBUG_SYNC
+//#define DEBUG_SYNC
 
 //////////////////////////////////////////////////////////////////////////////////
 // OmniDevice
@@ -228,7 +228,7 @@ bool OmniDevice::writeDeviceData(int data_type, int offset, const void* data, in
 #ifdef HAVE_CYUSB
 static std::string narrow(const std::wstring& str) {
   std::ostringstream stm ;
-  const std::ctype<char>& ctfacet = 
+  const std::ctype<char>& ctfacet =
     std::use_facet< std::ctype<char> >(stm.getloc());
   for(size_t i=0;i<str.size();++i)
     stm << char(ctfacet.narrow(std::ctype<char>::_Elem(str[i]),0));
