@@ -99,7 +99,7 @@ int main(int argc, char** argv) {
 
   printf("Publishing images...");
 
-  ros::Rate rate(20);
+  ros::Rate rate(18);
   while (ros::ok())
   {
     if ((r = occamDeviceReadData(device, sensor_count, req, 0, (void**)images, 1)) != OCCAM_API_SUCCESS)
