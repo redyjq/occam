@@ -99,7 +99,15 @@ int main(int argc, char** argv) {
 
   printf("Publishing images...");
 
-  ros::Rate rate(18);
+  int framerate;
+  ros::NodeHandle private_n("~");
+  private_n.param ("framerate", framerate, 18);
+  //if (!ros::param::get ("framerate", framerate))
+  //{
+  //  framerate = 18;
+  //}
+
+  ros::Rate rate (framerate);
   while (ros::ok())
   {
     if ((r = occamDeviceReadData(device, sensor_count, req, 0, (void**)images, 1)) != OCCAM_API_SUCCESS)
